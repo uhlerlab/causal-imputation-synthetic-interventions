@@ -1,0 +1,6 @@
+.idea/
+data/
+processing/helper_data/
+*__pycache__*
+venv/
+.ipynb_checkpoints/

@@ -29,6 +29,9 @@ def save_most_common_lists():
 
 class MostCommonManager:
     def __init__(self, num_celltypes, num_perts):
+        """
+        Base class for selecting a subset of the dataset containing the most common cell types and perturbations.
+        """
         self.nc = num_celltypes
         self.np = num_perts
         if not os.path.exists(PERTS_PER_CELLTYPE_FILE):

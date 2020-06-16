@@ -6,6 +6,7 @@ import numpy as np
 from typing import List
 
 BLACKLIST_KWARGS = {'verbose'}
+ADD_METRIC = True
 
 
 class PredictionManager:
@@ -28,13 +29,13 @@ class PredictionManager:
         num_folds: Number of folds used when checking performance.
         seed: random seed determining partitioning of folds.
         """
-        self.result_folder = os.path.join(result_folder, f'num_folds={num_folds}')
+        self.result_folder = os.path.join('evaluation', 'results', result_folder, f'num_folds={num_folds}')
 
         self.gene_expression_df = gene_expression_df
-        self.control_df = gene_expression_df[gene_expression_df['intervention'] == control_intervention]
+        self.control_df = gene_expression_df[gene_expression_df.index.get_level_values('intervention') == control_intervention]
 
-        self.units = list(gene_expression_df['unit'].unique())
-        self.interventions = list(gene_expression_df['intervention'].unique())
+        self.units = list(gene_expression_df.index.get_level_values('unit').unique())
+        self.interventions = list(gene_expression_df.index.get_level_values('intervention').unique())
         self.control_intervention = control_intervention
 
         np.random.seed(seed)
@@ -82,24 +83,33 @@ class PredictionManager:
             filenames = [os.path.join(folder, f'fold={k}.csv') for k in range(self.num_folds)]
 
             # if results already exist, just load them
-            if not overwrite and os.path.exists(folder):
+            if not overwrite and os.path.exists(filenames[0]):
                 self._predictions[full_alg_name] = [pd.read_csv(filename, index_col=0) for filename in filenames]
             else:
                 print(f"Predicting for {full_alg_name}")
 
                 # predict for each fold
                 self._predictions[full_alg_name] = []
-                for train_ixs, filename in zip(self.fold_train_ixs, filenames):
+                for train_ixs, test_ixs, filename in zip(self.fold_train_ixs, self.fold_test_ixs, filenames):
                     training_df = self.gene_expression_df.iloc[train_ixs]
+                    targets = self.gene_expression_df.iloc[test_ixs].index.to_list()
+                    if ADD_METRIC:
+                        control_df = self.control_df.copy()
+                        control_df['metric'] = 'm0'
+                        training_df['metric'] = 'm0'
+                        control_df = control_df.reset_index(['unit', 'intervention'])
+                        training_df = training_df.reset_index(['unit', 'intervention'])
+                    else:
+                        control_df = self.control_df
 
                     # depending on the type of the algorithm, feed dataframes in the right format
                     df = alg(
+                        control_df,
                         training_df,
-                        self.units,
-                        self.interventions,
+                        targets=targets,
                         **kwargs
-                    )['predicted_df']
-                    df = df.drop(columns=['metric'])
+                    )
+                    # df = df.drop(columns=['metric'])
 
                     # save the results
                     self._predictions[full_alg_name].append(df)

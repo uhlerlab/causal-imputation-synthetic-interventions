@@ -28,7 +28,7 @@ class AverageManager:
         * log2(x)+1 transformation
         * minmax scaling
         """
-        self.folder = os.path.join('processing', 'helper_data', folder)
+        self.folder = os.path.join('processing', 'helper_data', f'folder_log2={log2}_minmax={minmax}')
         self.original_expressions = original_expressions
         self.spaces2encoders = spaces2encoders if spaces2encoders is not None else {'original': lambda x: x}
         self.log2 = log2

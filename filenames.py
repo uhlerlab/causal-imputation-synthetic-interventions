@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from cmapPy.pandasGEXpress.parse import parse
 
 ROOT_FOLDER = os.path.dirname(__file__)
 DATA_FOLDER = os.path.join(ROOT_FOLDER, 'data')
@@ -27,3 +28,11 @@ def load_inst_info_original():
 
 def load_inst_info():
     return pd.read_csv(INST_INFO_EPSILON_FILE, sep='\t')
+
+
+def load_cmap():
+    return parse(LINCS2_EPSILON_IMPUTED_FILE).data_df
+
+
+def load_cmap_original():
+    return parse(LINCS2_EPSILON_FILE).data_df

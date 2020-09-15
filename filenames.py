@@ -24,7 +24,8 @@ GENE_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_gene_info.t
 INST_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info.txt')
 INST_INFO_EPSILON_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info_epsilon.txt')
 
-PERT_ID_FIELD = 'pert_iname'
+PERT_ID_FIELD = 'pert_id'
+PERT_OTHER_FIELD = 'pert_iname'
 
 
 def load_pert_info():
@@ -43,26 +44,52 @@ def load_gene_info():
     return pd.read_csv(GENE_INFO_FILE, sep='\t', index_col=0)
 
 
-def load_cmap():
-    return parse(LINCS2_EPSILON_IMPUTED_FILE).data_df.astype(np.uint16)
+def _format_cmap(data):
+    inst_info = load_inst_info()
+    data = data.T
+    data.index.rename('inst_id', inplace=True)
+    inst_info = inst_info.loc[data.index]
+    data['cell_id'] = inst_info['cell_id'].values
+    data[PERT_ID_FIELD] = inst_info[PERT_ID_FIELD].values
+    data = data.set_index(['cell_id', 'pert_id'], append=True)
+    return data
+
+
+def load_cmap_imputed():
+    print("Loading Level 2 (imputed)")
+    start = time()
+    data = parse(LINCS2_EPSILON_IMPUTED_FILE).data_df
+    data = _format_cmap(data)
+    print(f"Loading/processing took {time() - start} seconds")
+    return data
 
 
 def load_cmap_filtered():
-    return parse(LINCS2_EPSILON_825_FILE).data_df.astype(np.uint16)
+    print("Loading Level 2 (filtered)")
+    start = time()
+    data = parse(LINCS2_EPSILON_825_FILE).data_df
+    data = _format_cmap(data)
+    print(f"Loading/processing took {time() - start} seconds")
+    return data
 
 
 def load_cmap_original():
-    return parse(LINCS2_EPSILON_FILE).data_df.astype(np.uint16)
+    print("Loading Level 2 (original)")
+    start = time()
+    data = parse(LINCS2_EPSILON_FILE).data_df
+    data = _format_cmap(data)
+    print(f"Loading/processing took {time() - start} seconds")
+    return data
 
 
 def load_cmap_level3():
+    print("Loading Level 3")
     if os.path.exists(LINCS3_PRUNED_FILE):
-        return parse(LINCS3_PRUNED_FILE).data_df
+        data = parse(LINCS3_PRUNED_FILE).data_df
     else:
         gene_info = load_gene_info()
         l1000_genes = set(map(str, gene_info[gene_info['pr_is_lm'] == 1].index))
 
-        print("Loading")
         start = time()
         rows = parse(LINCS3_FILE, row_meta_only=True)
         row_ixs = rows.index.isin(l1000_genes).nonzero()[0]
@@ -76,4 +103,13 @@ def load_cmap_level3():
         write(lincs3_pruned_cmap, LINCS3_PRUNED_FILE)
         print(f"Saving took {time() - start} seconds")
 
-        return data
+    data = _format_cmap(data)
+    return data
+
+
+def save_gctx(df, file):
+    drop_levels = ['cell_id', PERT_ID_FIELD]
+    drop_levels = [level for level in drop_levels if level in df.index.names]
+    df.reset_index(drop_levels, drop=True, inplace=True)
+    gctoo = GCToo(df.T)
+    write(gctoo, file)

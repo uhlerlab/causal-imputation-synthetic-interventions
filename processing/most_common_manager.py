@@ -1,10 +1,10 @@
 import random
-from cmapPy.pandasGEXpress.parse import parse
 from cmapPy.pandasGEXpress.GCToo import GCToo
 from cmapPy.pandasGEXpress.write_gctx import write
 from filenames import *
 import pandas as pd
 import os
+import ipdb
 
 PERTS_PER_CELLTYPE_FILE = 'processing/helper_data/perts_per_celltype.csv'
 CELLTYPES_PER_PERT_FILE = 'processing/helper_data/celltypes_per_pert.csv'
@@ -12,11 +12,11 @@ CELLTYPES_PER_PERT_FILE = 'processing/helper_data/celltypes_per_pert.csv'
 
 def save_most_common_lists():
     print(f'[save_most_common_list] loading original LINCS2 data')
-    c = parse(LINCS2_EPSILON_FILE)
+    data_df = load_cmap()
 
     print(f'[save_most_common_list] sorting most common celltypes/perturbations')
-    inst_info = pd.read_csv(INST_INFO_FILE, sep='\t', index_col=0)
-    inst_info = inst_info.filter(set(c.data_df.columns), axis=0)
+    inst_info = load_inst_info()
+    inst_info = inst_info.filter(set(data_df.columns), axis=0)
     inst_info = inst_info[inst_info['pert_type'] == 'trt_cp']
     perts_per_celltype = inst_info.groupby('cell_id')[PERT_ID_FIELD].nunique().sort_values(ascending=False)
     celltypes_per_pert = inst_info.groupby(PERT_ID_FIELD)['cell_id'].nunique().sort_values(ascending=False)
@@ -48,23 +48,24 @@ class MostCommonManager:
             celltypes_per_pert = pd.read_csv(CELLTYPES_PER_PERT_FILE, index_col=0)
             selected_perts = set(celltypes_per_pert.index[:self.np]) | {'DMSO'}
 
-            print(f'[get_most_common_gctx] loading original LINCS2 data')
-            c = parse(LINCS2_EPSILON_FILE)
-            full_df = c.data_df
+            print(f'[MostCommonManager.get_most_common_gctx] loading original LINCS2 data')
+            full_df = load_cmap()
 
-            print(f'[get_most_common_gctx] filtering to most common {self.nc} celltypes and {self.np} perturbations')
-            inst_info = pd.read_csv(INST_INFO_FILE, sep='\t', index_col=0)
+            print(f'[MostCommonManager.get_most_common_gctx] filtering to most common {self.nc} celltypes and {self.np} perturbations')
+            inst_info = load_inst_info()
+            # inst_info = pd.read_csv(INST_INFO_FILE, sep='\t', index_col=0)
             selected_inst_ids = inst_info[
                 inst_info[PERT_ID_FIELD].isin(selected_perts) &
                 inst_info['cell_id'].isin(selected_celltypes)
             ].index
+            print(f"[MostCommonManager.get_most_common_gctx] {len(selected_inst_ids)} inst_id's selected")
             new_df = full_df.filter(selected_inst_ids)
 
-            print(f'[get_most_common_gctx] saving to {filename}')
+            print(f'[MostCommonManager.get_most_common_gctx] saving to {filename}')
             gctoo = GCToo(new_df)
             write(gctoo, filename)
         else:
-            print(f'[get_most_common_gctx] loading from {filename}')
+            print(f'[MostCommonManager.get_most_common_gctx] loading from {filename}')
             gctoo = parse(filename)
 
         df = gctoo.data_df

@@ -9,7 +9,7 @@ average of *all* genes in the same perturbation/cell type pair.
 
 from cmapPy.pandasGEXpress.write_gctx import write
 from cmapPy.pandasGEXpress.GCToo import GCToo
-from filenames import load_inst_info, LINCS2_EPSILON_IMPUTED_FILE, load_cmap_original
+from filenames import load_inst_info, LINCS2_EPSILON_IMPUTED_FILE, load_cmap_original, LINCS2_EPSILON_825_FILE
 import numpy as np
 from tqdm import tqdm
 tqdm.pandas()
@@ -19,9 +19,15 @@ original_data = load_cmap_original().T
 print("Replacing 1 with NaN")
 data = original_data.replace(1, np.nan)
 
+print("Filtering out genes with any NaNs")
+retained_genes = ~data.isna().any(axis=0)
+filtered_data = data.loc[:, retained_genes]
+filtered_data = filtered_data.T
+gctoo = GCToo(filtered_data)
+write(gctoo, LINCS2_EPSILON_825_FILE)
+
 print("Adding cell_id/pert_id rows to data")
 inst_info = load_inst_info()
-inst_info = inst_info.set_index('inst_id')
 inst_info = inst_info.loc[data.index]
 data['cell_id'] = inst_info['cell_id'].values
 data['pert_id'] = inst_info['pert_id'].values

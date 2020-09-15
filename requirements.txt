@@ -11,6 +11,7 @@ defusedxml==0.6.0
 entrypoints==0.3
 h5py==2.10.0
 idna==2.10
+ipdb==0.13.3
 ipykernel==5.3.4
 ipython==7.18.1
 ipython-genutils==0.2.0
@@ -33,6 +34,7 @@ packaging==20.4
 pandas==1.1.1
 pandocfilters==1.4.2
 parso==0.7.1
+patsy==0.5.1
 pexpect==4.8.0
 pickleshare==0.7.5
 prometheus-client==0.8.0
@@ -52,6 +54,7 @@ scikit-learn==0.23.2
 scipy==1.5.2
 Send2Trash==1.5.0
 six==1.15.0
+statsmodels==0.12.0
 terminado==0.8.3
 testpath==0.4.4
 threadpoolctl==2.1.0

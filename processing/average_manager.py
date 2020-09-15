@@ -4,13 +4,9 @@ from cmapPy.pandasGEXpress.parse import parse
 from cmapPy.pandasGEXpress.write_gctx import write
 from cmapPy.pandasGEXpress.GCToo import GCToo
 import pandas as pd
+from utils import pandas_minmax
 from typing import Dict, Optional
-from sklearn.preprocessing import minmax_scale
 from filenames import *
-
-
-def pandas_minmax(df, axis):
-    return pd.DataFrame(minmax_scale(df, axis=axis), index=df.index, columns=df.columns)
 
 
 class AverageManager:

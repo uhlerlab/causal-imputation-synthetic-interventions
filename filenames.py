@@ -36,7 +36,7 @@ def load_inst_info_original():
     return pd.read_csv(INST_INFO_FILE, sep='\t')
 
 
-def load_inst_info():
+def load_inst_info_epsilon():
     return pd.read_csv(INST_INFO_EPSILON_FILE, sep='\t', index_col=0)
 
 
@@ -45,13 +45,19 @@ def load_gene_info():
 
 
 def _format_cmap(data):
-    inst_info = load_inst_info()
+    inst_info = load_inst_info_epsilon()
     data = data.T
     data.index.rename('inst_id', inplace=True)
+
+    # make sure inst_info has same order as data
+    data = data.filter(set(inst_info.index), axis=0)
     inst_info = inst_info.loc[data.index]
+
+    # add cell_id and pert_id fields and set as index
     data['cell_id'] = inst_info['cell_id'].values
     data[PERT_ID_FIELD] = inst_info[PERT_ID_FIELD].values
     data = data.set_index(['cell_id', 'pert_id'], append=True)
+
     return data
 
 

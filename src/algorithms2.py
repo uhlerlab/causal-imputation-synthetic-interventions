@@ -59,9 +59,25 @@ def impute_two_way_mean(df, targets, lam=.5):
     return imputed_df
 
 
-def predict_intervention_fixed_effect(df, units, interventions, control_intervention):
-    pass
+def predict_intervention_fixed_effect(df, targets, control_intervention):
+    control_df = df.query('intervention == @control_intervention')
+    control_df.reset_index(level='intervention', drop=True, inplace=True)
+    intervention_effects = df.subtract(control_df, level='unit')
+    average_intervention_effects = intervention_effects.groupby('intervention').mean()
+
+    target_units, target_ivs = zip(*targets)
+    predicted_data = control_df.loc[list(target_units)].values + average_intervention_effects.loc[list(target_ivs)].values
+    predicted_df = pd.DataFrame(predicted_data, index=targets, columns=control_df.columns)
+
+    return predicted_df
 
 
 def predict_unit_fixed_effect(df, units, interventions, control_unit):
+    pass
+
+
+def predict_synthetic_control_unit(df, targets):
+    # for each target, find other units which have received the desired intervention, and fit coefficients using control data
+
+    # then, predict the value using those coefficients
     pass

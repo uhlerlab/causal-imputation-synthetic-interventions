@@ -10,7 +10,7 @@ def get_data_block(cell_start: int, cell_stop: int, pert_start: int, pert_stop: 
     pert_ranks = load_pert_ranks()
     cell_ranks = load_cell_ranks()
     cells = set(cell_ranks[cell_start:cell_stop].index)
-    perts = set(pert_ranks[pert_start:pert_stop].index)
+    perts = set(pert_ranks[pert_start:pert_stop].index) | {'DMSO'}
 
     block = averages.query("cell_id in @cells and pert_id in @perts")
     block.index.rename(['unit', 'intervention'], inplace=True)

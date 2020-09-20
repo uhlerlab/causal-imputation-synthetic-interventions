@@ -11,7 +11,7 @@ def get_data_block(cell_start: int, cell_stop: int, pert_start: int, pert_stop: 
     cells = set(cell_ranks[cell_start:cell_stop].index)
     perts = set(pert_ranks[pert_start:pert_stop].index)
     block = averages.query("cell_id in @cells and pert_id in @perts")
-    return block
+    return block, cells, perts
 
 
 if __name__ == '__main__':

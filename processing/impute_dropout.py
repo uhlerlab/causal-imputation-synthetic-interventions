@@ -9,6 +9,7 @@ average of *all* genes in the same perturbation/cell type pair.
 
 from filenames import LINCS2_EPSILON_IMPUTED_FILE, load_cmap_original, LINCS2_EPSILON_825_FILE, save_gctx
 from filenames import PERT_ID_FIELD, PERT_OTHER_FIELD
+from filenames import NUM_DROPOUTS_FILE
 import numpy as np
 from tqdm import tqdm
 tqdm.pandas()
@@ -17,6 +18,8 @@ print("Loading data")
 original_data = load_cmap_original()
 print("Replacing 1 with NaN")
 data = original_data.replace(1, np.nan)
+num_dropouts = data.isna().sum(axis=1)
+num_dropouts.to_pickle(NUM_DROPOUTS_FILE)
 
 print("Filtering out genes with any NaNs")
 retained_genes = ~data.isna().any(axis=0)

@@ -24,6 +24,10 @@ GENE_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_gene_info.t
 INST_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info.txt')
 INST_INFO_EPSILON_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info_epsilon.txt')
 
+NUM_DROPOUTS_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'epsilon_num_dropouts.pkl')
+CELL_RANK_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'cell_ranks.csv')
+PERT_RANK_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'pert_ranks.csv')
+
 PERT_ID_FIELD = 'pert_id'
 PERT_OTHER_FIELD = 'pert_iname'
 
@@ -119,3 +123,15 @@ def save_gctx(df, file):
     df.reset_index(drop_levels, drop=True, inplace=True)
     gctoo = GCToo(df.T)
     write(gctoo, file)
+
+
+def load_num_dropouts():
+    return pd.read_pickle(NUM_DROPOUTS_FILE)
+
+
+def load_pert_ranks():
+    return pd.read_csv(PERT_RANK_FILE, index_col=0)
+
+
+def load_cell_ranks():
+    return pd.read_csv(CELL_RANK_FILE, index_col=0)

@@ -6,26 +6,6 @@ import pandas as pd
 import os
 import ipdb
 
-PERTS_PER_CELLTYPE_FILE = 'processing/helper_data/perts_per_celltype.csv'
-CELLTYPES_PER_PERT_FILE = 'processing/helper_data/celltypes_per_pert.csv'
-
-
-def save_most_common_lists():
-    print(f'[save_most_common_list] loading original LINCS2 data')
-    data_df = load_cmap()
-
-    print(f'[save_most_common_list] sorting most common celltypes/perturbations')
-    inst_info = load_inst_info()
-    inst_info = inst_info.filter(set(data_df.columns), axis=0)
-    inst_info = inst_info[inst_info['pert_type'] == 'trt_cp']
-    perts_per_celltype = inst_info.groupby('cell_id')[PERT_ID_FIELD].nunique().sort_values(ascending=False)
-    celltypes_per_pert = inst_info.groupby(PERT_ID_FIELD)['cell_id'].nunique().sort_values(ascending=False)
-
-    print(f'[save_most_common_list] saving sorted lists into files')
-    os.makedirs('processing/helper_data', exist_ok=True)
-    perts_per_celltype.to_csv(PERTS_PER_CELLTYPE_FILE)
-    celltypes_per_pert.to_csv(CELLTYPES_PER_PERT_FILE)
-
 
 class MostCommonManager:
     def __init__(self, num_celltypes, num_perts):
@@ -34,8 +14,6 @@ class MostCommonManager:
         """
         self.nc = num_celltypes
         self.np = num_perts
-        if not os.path.exists(PERTS_PER_CELLTYPE_FILE):
-            save_most_common_lists()
 
     def get_most_common_gctx(self, overwrite=False):
         filename = os.path.join('processing', 'helper_data', 'most_common', f'{self.nc}celltypes_{self.np}perts.gctx')

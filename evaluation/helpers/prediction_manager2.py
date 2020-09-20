@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import numpy as np
 from typing import List
-from evaluation.get_data_block import get_data_block
+from evaluation.helpers.get_data_block import get_data_block
 
 BLACKLIST_KWARGS = {'verbose'}
 ADD_METRIC = True

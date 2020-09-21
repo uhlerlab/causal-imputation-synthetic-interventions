@@ -63,34 +63,34 @@ def _format_cmap(data):
 
 
 def load_cmap_imputed():
-    print("Loading Level 2 (imputed)")
+    print("[load_cmap_imputed] Loading...")
     start = time()
     data = pd.read_pickle(LINCS2_EPSILON_IMPUTED_FILE)
-    print(f"Loading/processing took {time() - start} seconds")
+    print(f"[load_cmap_imputed] ... Loading took {time() - start} seconds")
     return data
 
 
 def load_cmap_filtered():
-    print("Loading Level 2 (filtered)")
+    print("[load_cmap_filtered] Loading...")
     start = time()
     data = pd.read_pickle(LINCS2_EPSILON_825_FILE)
-    print(f"Loading/processing took {time() - start} seconds")
+    print(f"[load_cmap_filtered] ... Loading took {time() - start} seconds")
     return data
 
 
 def load_cmap_original():
-    print("Loading Level 2 (original)")
+    print("[load_cmap_original] Loading...")
     start = time()
     data = pd.read_pickle(LINCS2_EPSILON_FILE)
-    print(f"Loading/processing took {time() - start} seconds")
+    print(f"[load_cmap_original] ... Loading took {time() - start} seconds")
     return data
 
 
 def load_cmap_level3():
-    print("Loading Level 3")
+    print("[load_cmap_level3] Loading...")
     start = time()
     data = pd.read_pickle(LINCS3_PRUNED_FILE)
-    print(f"Loading/processing took {time() - start} seconds")
+    print(f"[load_cmap_level3] ... Loading took {time() - start} seconds")
     return data
 
 

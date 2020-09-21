@@ -11,17 +11,17 @@ def main(data, name, log2=False, minmax=False):
 
     start = time()
     if log2:
-        print("Log2")
+        print("[processing/create_averages] Log2")
         data = np.log2(data+1)
     if minmax:
-        print("Minmax")
+        print("[processing/create_averages] Minmax")
         data = pandas_minmax(data, axis=1)
-        print("Mean")
-    
+        print("[processing/create_averages] Mean")
+
     means = data.groupby(level=['cell_id', PERT_ID_FIELD]).mean()
-    print("Saving")
+    print("[processing/create_averages] Saving")
     means.to_pickle(f"data/processed/averages/{name}{optional_str('_log2', log2)}{optional_str('_minmax', minmax)}.pkl")
-    print(f"Computing/saving averages took {time() - start} seconds")
+    print(f"[processing/create_averages] Computing/saving averages took {time() - start} seconds")
 
 
 if __name__ == '__main__':

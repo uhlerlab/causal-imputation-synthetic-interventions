@@ -36,10 +36,10 @@ def main(name, cmap_file):
 
 
 if __name__ == '__main__':
-    from filenames import LINCS2_EPSILON_FILE, LINCS2_EPSILON_IMPUTED_FILE, LINCS2_EPSILON_825_FILE, LINCS3_PRUNED_FILE
+    from filenames import LINCS2_EPSILON_FILE_GCTX, LINCS2_EPSILON_IMPUTED_FILE, LINCS2_EPSILON_825_FILE, LINCS3_PRUNED_FILE
 
     files = {
-        'original_level2': LINCS2_EPSILON_FILE,
+        'original_level2': LINCS2_EPSILON_FILE_GCTX,
         'imputed_level2': LINCS2_EPSILON_IMPUTED_FILE,
         'filtered_level2': LINCS2_EPSILON_825_FILE,
         'level3': LINCS3_PRUNED_FILE,

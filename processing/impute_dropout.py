@@ -7,8 +7,8 @@ a gene is missing for all samples from the same perturbation/cell type pair, we 
 average of *all* genes in the same perturbation/cell type pair.
 """
 
-from filenames import LINCS2_EPSILON_IMPUTED_FILE, load_cmap_original, LINCS2_EPSILON_825_FILE, save_gctx
-from filenames import PERT_ID_FIELD, PERT_OTHER_FIELD
+from filenames import LINCS2_EPSILON_IMPUTED_FILE, load_cmap_original, LINCS2_EPSILON_825_FILE
+from filenames import PERT_ID_FIELD
 from filenames import NUM_DROPOUTS_FILE
 import numpy as np
 from tqdm import tqdm
@@ -24,7 +24,7 @@ num_dropouts.to_pickle(NUM_DROPOUTS_FILE)
 print("Filtering out genes with any NaNs")
 retained_genes = ~data.isna().any(axis=0)
 filtered_data = data.loc[:, retained_genes]
-save_gctx(filtered_data, LINCS2_EPSILON_825_FILE)
+filtered_data.to_pickle(LINCS2_EPSILON_825_FILE)
 
 print("Computing means")
 means_per_gene = data.groupby(level=['cell_id', PERT_ID_FIELD]).mean()
@@ -41,5 +41,5 @@ imputed_data = data.mask(data.isna(), repeated_means)
 print("Saving imputed data")
 imputed_data = imputed_data
 imputed_data.index = original_data.index.get_level_values('inst_id')
-save_gctx(imputed_data, LINCS2_EPSILON_IMPUTED_FILE)
+imputed_data.to_pickle(LINCS2_EPSILON_IMPUTED_FILE)
 print(f"Are there any NaN's remaining in the imputed data? {imputed_data.isna().any().any()}")

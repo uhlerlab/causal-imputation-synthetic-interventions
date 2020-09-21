@@ -21,7 +21,8 @@ class PredictionManager:
             num_folds: int = 5,
             seed: int = 8838
     ):
-        self.result_folder = os.path.join('evaluation', 'results', f'cell={cell_start}-{cell_stop},pert={pert_start}-{pert_stop}', f'num_folds={num_folds}')
+        self.result_string = f'cell={cell_start}-{cell_stop},pert={pert_start}-{pert_stop},name={name},num_folds={num_folds}'
+        self.result_folder = os.path.join('evaluation', 'results', self.result_string)
 
         self.gene_expression_df, self.units, self.interventions, _ = get_data_block(cell_start, cell_stop, pert_start, pert_stop, name=name)
         # sort so that DMSO comes first
@@ -73,11 +74,11 @@ class PredictionManager:
             # filenames for the results of each fold
             alg_results_folder = os.path.join(self.result_folder, full_alg_name)
             os.makedirs(alg_results_folder, exist_ok=True)
-            result_filenames = [os.path.join(alg_results_folder, f'fold={k}.csv') for k in range(self.num_folds)]
+            result_filenames = [os.path.join(alg_results_folder, f'fold={k}.pkl') for k in range(self.num_folds)]
 
             # if results already exist, just load them
             if not overwrite and os.path.exists(result_filenames[0]):
-                self._predictions[full_alg_name] = [pd.read_csv(filename, index_col=0) for filename in result_filenames]
+                self._predictions[full_alg_name] = [pd.read_pickle(filename) for filename in result_filenames]
             else:
                 print(f"Predicting for {full_alg_name}")
 
@@ -90,7 +91,7 @@ class PredictionManager:
 
                     # save the results
                     self._predictions[full_alg_name].append(df)
-                    df.to_csv(filename)
+                    df.to_pickle(filename)
 
             return self._predictions[full_alg_name]
 

@@ -88,6 +88,7 @@ class PredictionManager:
                     training_df = self.gene_expression_df.iloc[train_ixs]
                     targets = self.gene_expression_df.iloc[test_ixs].index
                     df = alg(training_df, targets, **kwargs)
+                    df = df.loc[targets]
 
                     # save the results
                     self._predictions[full_alg_name].append(df)

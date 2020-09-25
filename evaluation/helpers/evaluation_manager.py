@@ -1,11 +1,41 @@
 from evaluation.helpers.prediction_manager2 import PredictionManager
 import pandas as pd
-from sklearn.metrics import r2_score
 import ipdb
 import matplotlib.pyplot as plt
 import os
 import seaborn as sns
+import numpy as np
+from evaluation.plot_utils import boxplots
 sns.set()
+
+
+boxColors = ['#addd8e', '#31a354', '#7fcdbb', '#2c7fb8',
+             '#feb24c', '#f03b20', '#c51b8a', '#756bb1']
+
+alg_names = {
+    'alg=impute_unit_mean': 'Mean in Unit',
+    'alg=impute_intervention_mean': 'Mean in Intervention',
+    'alg=impute_two_way_mean': '2-way Mean',
+    'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
+    'alg=predict_synthetic_control_unit,num_desired_interventions=1,progress=True': 'SCU-1',
+    'alg=predict_synthetic_control_unit,num_desired_interventions=3,progress=True': 'SCU-2',
+    'alg=predict_synthetic_control_unit,num_desired_interventions=None,progress=True': 'SCU-None',
+}
+
+
+def compute_r2_matrix(true_values, predicted_values):
+    """Faster implementation of sklearn.metrics.r2_score for matrices"""
+    true_means = true_values.mean(axis=1)
+    baseline_error = np.sum((true_values - true_means[:, None])**2, axis=1)
+    true_error = np.sum((true_values - predicted_values)**2, axis=1)
+    return 1 - true_error/baseline_error
+
+
+def compute_r2_vector(true_values, predicted_values):
+    true_mean = true_values.mean()
+    baseline_error = np.sum((true_values - true_mean)**2)
+    true_error = np.sum((true_values - predicted_values)**2)
+    return 1 - true_error/baseline_error
 
 
 class EvaluationManager:
@@ -13,40 +43,84 @@ class EvaluationManager:
         self.prediction_manager = prediction_manager
 
     def r2(self):
-        alg2r2s = {}
+        num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
+        num_rows = num_rows_per_alg * len(self.prediction_manager._predictions)
+        r2s = np.zeros(num_rows)
+        index = []
+
+        ix = 0
         for alg, predicted_dfs in self.prediction_manager._predictions.items():
             print(f'[EvaluationManager.r2] computing r2 for {alg}')
-            r2_dfs = []
-            for test_ixs, predicted_df in zip(self.prediction_manager.fold_test_ixs, predicted_dfs):
+            for fold_ix, (test_ixs, predicted_df) in enumerate(zip(self.prediction_manager.fold_test_ixs, predicted_dfs)):
                 # get test data that was held out in this fold
                 test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
-                test_df = test_df.sort_index()
-
-                # take the predicted df at the corresponding indices
-                predicted_df = predicted_df.sort_index()
-                # predicted_df = predicted_df.loc[test_df.index]
+                assert (test_df.index == predicted_df.index).all()
 
                 # compute the R2 score for each gene expression profile
-                r2s = []
-                for ((unit, iv), predicted_values), (_, true_values) in zip(predicted_df.iterrows(), test_df.iterrows()):
-                    r2s.append({'unit': unit, 'intervention': iv, f'r2_{alg}': r2_score(true_values, predicted_values)})
-                r2_df = pd.DataFrame(r2s)
-                r2_df = r2_df.set_index(['unit', 'intervention'])
-                r2_dfs.append(r2_df)
-            alg2r2s[alg] = r2_dfs
+                r2s[ix:(ix+predicted_df.shape[0])] = compute_r2_matrix(test_df.values, predicted_df.values)
+                units, ivs = predicted_df.index.get_level_values('unit'), predicted_df.index.get_level_values('intervention')
+                index.extend(list(zip(units, ivs, [fold_ix]*len(units), [alg]*len(units))))
+                ix += predicted_df.shape[0]
 
-        return alg2r2s
+        res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
+        return res
+
+    def r2_per_iv(self):
+        r2s = []
+        index = []
+        for alg, predicted_dfs in self.prediction_manager._predictions.items():
+            print(f'[EvaluationManager.r2_in_iv] computing r2 for {alg}')
+            for fold_ix, (test_ixs, predicted_df) in enumerate(zip(self.prediction_manager.fold_test_ixs, predicted_dfs)):
+                test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
+                iv_ix_dict = test_df.groupby('intervention').indices
+                ivs = list(iv_ix_dict.keys())
+                test_values = test_df.values
+                predicted_values = predicted_df.values
+                r = [
+                    compute_r2_vector(test_values[iv_ix].flatten(), predicted_values[iv_ix].flatten())
+                    for iv, iv_ix in iv_ix_dict.items()
+                ]
+                r2s.extend(r)
+                index.extend(list(zip(ivs, [fold_ix]*len(ivs), [alg]*len(ivs))))
+
+        res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['intervention', 'fold_ix', 'alg']))
+        return res
 
     def mse(self):
         alg2mse = dict()
 
     def boxplot(self):
-        alg2r2s = self.r2()
-        algs = list(alg2r2s.keys())
-        full_dfs = [pd.concat(r2_dfs) for alg, r2_dfs in alg2r2s.items()]
+        r2_df = self.r2()
+        algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: r2_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
-        plt.boxplot([full_df.values.flatten() for full_df in full_dfs], labels=algs)
-        plt.ylim([0, 1])
-        plt.legend()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='$R^2$ score per (cell type, intervention) pair',
+            title='Estimated Gene Expression',
+            top=1,
+            bottom=.5,
+            scale=.03
+        )
         os.makedirs('evaluation/plots', exist_ok=True)
         plt.savefig(f'evaluation/plots/boxplot_{self.prediction_manager.result_string}.png')
+
+    def boxplot_per_intervention(self):
+        r2_df = self.r2_per_iv()
+        algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: r2_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='$R^2$ score per (cell type, intervention) pair',
+            title='Estimated Gene Expression',
+            top=1,
+            bottom=.5,
+            scale=.03
+        )
+        os.makedirs('evaluation/plots', exist_ok=True)
+        plt.savefig(f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png')

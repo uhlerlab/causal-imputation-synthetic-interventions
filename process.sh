@@ -4,6 +4,8 @@
 python3 processing/filter_inst_info_epsilon.py
 # convert the gctx file to a pandas pickle file for faster read/write
 python3 processing/convert_to_pickle.py
+# for each pert_id, pick the dosage amount/time which has the greatest number of samples
+python3 processing/filter_most_common_dosage.py
 # create imputed/filtered versions of the level 2 data
 python3 processing/impute_dropout.py
 # create a pandas pickle file for the level 3 data with only l1000 genes

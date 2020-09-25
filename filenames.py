@@ -34,7 +34,7 @@ def load_pert_info():
 
 
 def load_inst_info_original():
-    return pd.read_csv(INST_INFO_FILE, sep='\t')
+    return pd.read_csv(INST_INFO_FILE, sep='\t', index_col=0)
 
 
 def load_inst_info_epsilon():
@@ -45,9 +45,9 @@ def load_gene_info():
     return pd.read_csv(GENE_INFO_FILE, sep='\t', index_col=0)
 
 
-def _format_cmap(data):
+def _format_cmap(data_):
     inst_info = load_inst_info_epsilon()
-    data = data.T
+    data = data_.T
     data.index.rename('inst_id', inplace=True)
 
     # make sure inst_info has same order as data

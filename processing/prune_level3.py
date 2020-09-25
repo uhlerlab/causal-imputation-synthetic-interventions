@@ -11,10 +11,10 @@ row_ixs = rows.index.isin(l1000_genes).nonzero()[0]
 data = parse(LINCS3_FILE_GCTX, ridx=row_ixs).data_df
 print(f"Loading took {time() - start} seconds")
 
-data = _format_cmap(data)
+data_ = _format_cmap(data)
 
 print("Saving")
 start = time()
-data.to_pickle(LINCS3_PRUNED_FILE)
+data_.to_pickle(LINCS3_PRUNED_FILE)
 print(f"Saving took {time() - start} seconds")
 

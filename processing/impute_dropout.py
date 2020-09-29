@@ -54,7 +54,6 @@ print(f"[processing/impute_dropout] Mask took {time() - start} seconds")
 
 print("[processing/impute_dropout] Saving imputed data")
 start = time()
-imputed_data.index = original_data.index.get_level_values('inst_id')
 imputed_data.to_pickle(LINCS2_EPSILON_IMPUTED_FILE)
 print(f"[processing/impute_dropout] Saving imputed data took {time() - start} seconds.")
 print(f"[processing/impute_dropout] Are there any NaN's remaining in the imputed data? {imputed_data.isna().any().any()}")

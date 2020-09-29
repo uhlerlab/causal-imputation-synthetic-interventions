@@ -70,11 +70,27 @@ def load_cmap_imputed():
     return data
 
 
+def load_cmap_most_common_imputed():
+    print("[load_cmap_most_common_imputed] Loading...")
+    start = time()
+    data = pd.read_pickle('data/processed/most_common_dosages/level2_imputed.pkl')
+    print(f"[load_cmap_most_common_imputed] ... Loading took {time() - start} seconds")
+    return data
+
+
 def load_cmap_filtered():
     print("[load_cmap_filtered] Loading...")
     start = time()
     data = pd.read_pickle(LINCS2_EPSILON_825_FILE)
     print(f"[load_cmap_filtered] ... Loading took {time() - start} seconds")
+    return data
+
+
+def load_cmap_most_common_filtered():
+    print("[load_cmap_most_common_filtered] Loading...")
+    start = time()
+    data = pd.read_pickle('data/processed/most_common_dosages/level2_filtered.pkl')
+    print(f"[load_cmap_most_common_filtered] ... Loading took {time() - start} seconds")
     return data
 
 
@@ -86,11 +102,27 @@ def load_cmap_original():
     return data
 
 
+def load_cmap_most_common_original():
+    print("[load_cmap_most_common_original] Loading...")
+    start = time()
+    data = pd.read_pickle('data/processed/most_common_dosages/level2.pkl')
+    print(f"[load_cmap_most_common_original] ... Loading took {time() - start} seconds")
+    return data
+
+
 def load_cmap_level3():
     print("[load_cmap_level3] Loading...")
     start = time()
     data = pd.read_pickle(LINCS3_PRUNED_FILE)
     print(f"[load_cmap_level3] ... Loading took {time() - start} seconds")
+    return data
+
+
+def load_cmap_most_common_level3():
+    print("[load_cmap_most_common_level3] Loading...")
+    start = time()
+    data = pd.read_pickle('data/processed/most_common_dosages/level2.pkl')
+    print(f"[load_cmap_most_common_level3] ... Loading took {time() - start} seconds")
     return data
 
 

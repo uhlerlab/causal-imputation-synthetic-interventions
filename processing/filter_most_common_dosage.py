@@ -35,9 +35,9 @@ def main(data, name):
 if __name__ == '__main__':
     files = {
         # 'level2_filtered': load_cmap_filtered,
-        # 'level2_imputed': load_cmap_imputed,
+        'level2_imputed': load_cmap_imputed,
         # 'level2': load_cmap_original,
-        'level3': load_cmap_level3
+        # 'level3': load_cmap_level3
     }
 
     for name, data_loader in files.items():

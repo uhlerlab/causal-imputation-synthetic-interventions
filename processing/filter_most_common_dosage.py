@@ -1,5 +1,5 @@
 from filenames import load_cmap_original, load_cmap_filtered, load_cmap_imputed, load_cmap_level3, load_inst_info_epsilon
-from filenames import PERT_ID_FIELD
+from filenames import PERT_ID_FIELD, INST_INFO_MOST_COMMON_FILE
 import ipdb
 from time import time
 import os
@@ -17,10 +17,14 @@ dosage_count_df = dosage_counts.reset_index('pert_meta_full')
 most_common_dosage_df = dosage_count_df[~dosage_count_df.index.duplicated(keep='first')]
 assert most_common_dosage_df.shape[0] == inst_info[PERT_ID_FIELD].nunique()
 
+# need to keep all DMSO for everything
 most_common_dosages = set(most_common_dosage_df.index.to_series() + ',' + most_common_dosage_df['pert_meta_full'])
-retained_inst_info = inst_info.query('pert_id_meta in @most_common_dosages')
+retained_inst_info = inst_info.query('pert_id_meta in @most_common_dosages or pert_id == "DMSO"')
 retained_inst_ids = retained_inst_info.index
-assert retained_inst_info.shape[0] == most_common_dosage_df['count'].sum()
+
+inst_info_most_common = inst_info.loc[retained_inst_ids]
+inst_info_most_common.to_pickle(INST_INFO_MOST_COMMON_FILE)
+# assert retained_inst_info.shape[0] == most_common_dosage_df['count'].sum()
 
 
 def main(data, name):
@@ -34,10 +38,10 @@ def main(data, name):
 
 if __name__ == '__main__':
     files = {
-        # 'level2_filtered': load_cmap_filtered,
+        'level2_filtered': load_cmap_filtered,
         'level2_imputed': load_cmap_imputed,
-        # 'level2': load_cmap_original,
-        # 'level3': load_cmap_level3
+        'level2': load_cmap_original,
+        'level3': load_cmap_level3
     }
 
     for name, data_loader in files.items():

@@ -6,8 +6,8 @@ lp = LineProfiler()
 algs = []
 
 
-for pert_start in [0, 20, 50, 100, 1000, 2000, 5000]:
-    pm = PredictionManager(0, 10, pert_start, pert_start+20, name='level2')
+for pert_start in [0]:
+    pm = PredictionManager(0, 10, pert_start, pert_start+20, name='level2_common')
     pm.predict(impute_unit_mean)
     pm.predict(impute_intervention_mean)
     pm.predict(impute_two_way_mean)

@@ -89,6 +89,7 @@ class PredictionManager:
                     targets = self.gene_expression_df.iloc[test_ixs].index
                     df = alg(training_df, targets, **kwargs)
                     df = df.loc[targets]
+                    print(df.index == targets)
 
                     # save the results
                     self._predictions[full_alg_name].append(df)

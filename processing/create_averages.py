@@ -33,7 +33,7 @@ if __name__ == '__main__':
         # 'level2_imputed': load_cmap_imputed,
         # 'level2': load_cmap_original,
         # 'level3': load_cmap_level3,
-        # 'level2_filtered_common': load_cmap_most_common_filtered,
+        'level2_filtered_common': load_cmap_most_common_filtered,
         'level2_imputed_common': load_cmap_most_common_imputed,
         'level2_common': load_cmap_most_common_original,
         'level3_common': load_cmap_most_common_level3,

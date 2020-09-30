@@ -1,14 +1,39 @@
-from filenames import load_cell_ranks, load_pert_ranks
+from filenames import load_cell_ranks, load_pert_ranks, load_cell_ranks_common, load_pert_ranks_common
+from typing import Optional
 import pandas as pd
 import itertools as itr
 import ipdb
 
 
-def get_data_block(cell_start: int, cell_stop: int, pert_start: int, pert_stop: int, name='level2_filtered'):
+def remove_celltypes_no_control(
+        data,
+        control_pert='DMSO'
+):
+    retained_units = set(data.query("intervention == @control_pert").index.get_level_values('unit'))
+    retained_data = data.query("unit in @retained_units")
+    ipdb.set_trace()
+    return retained_data
+
+
+def get_data_block(
+        cell_start: int,
+        cell_stop: Optional[int],
+        pert_start: int,
+        pert_stop: Optional[int],
+        name='level2_filtered',
+        common=True
+):
     print("[get_data_block] loading averages")
     averages = pd.read_pickle(f'data/processed/averages/{name}.pkl')
-    pert_ranks = load_pert_ranks()
-    cell_ranks = load_cell_ranks()
+    if common:
+        pert_ranks = load_pert_ranks_common()
+        cell_ranks = load_cell_ranks_common()
+    else:
+        pert_ranks = load_pert_ranks()
+        cell_ranks = load_cell_ranks()
+
+    cell_stop = cell_stop if cell_stop is not None else len(cell_ranks)
+    pert_stop = pert_stop if pert_stop is not None else len(pert_ranks)
     cells = set(cell_ranks[cell_start:cell_stop].index)
     perts = set(pert_ranks[pert_start:pert_stop].index) | {'DMSO'}
 

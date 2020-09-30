@@ -20,10 +20,13 @@ PERT_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_pert_info.t
 GENE_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_gene_info.txt')
 INST_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info.txt')
 INST_INFO_EPSILON_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info_epsilon.pkl')
+INST_INFO_MOST_COMMON_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info_common.pkl')
 
 NUM_DROPOUTS_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'epsilon_num_dropouts.pkl')
 CELL_RANK_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'cell_ranks.csv')
 PERT_RANK_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'pert_ranks.csv')
+CELL_RANK_COMMON_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'cell_ranks_common.csv')
+PERT_RANK_COMMON_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'pert_ranks_common.csv')
 
 PERT_ID_FIELD = 'pert_id'
 PERT_OTHER_FIELD = 'pert_iname'
@@ -39,6 +42,10 @@ def load_inst_info_original():
 
 def load_inst_info_epsilon():
     return pd.read_pickle(INST_INFO_EPSILON_FILE)
+
+
+def load_inst_info_most_common():
+    return pd.read_pickle(INST_INFO_MOST_COMMON_FILE)
 
 
 def load_gene_info():
@@ -136,3 +143,11 @@ def load_pert_ranks():
 
 def load_cell_ranks():
     return pd.read_csv(CELL_RANK_FILE, index_col=0)
+
+
+def load_pert_ranks_common():
+    return pd.read_csv(PERT_RANK_COMMON_FILE, index_col=0)
+
+
+def load_cell_ranks_common():
+    return pd.read_csv(CELL_RANK_COMMON_FILE, index_col=0)

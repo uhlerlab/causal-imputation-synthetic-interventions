@@ -19,12 +19,12 @@ assert most_common_dosage_df.shape[0] == inst_info[PERT_ID_FIELD].nunique()
 
 # need to keep all DMSO for everything
 most_common_dosages = set(most_common_dosage_df.index.to_series() + ',' + most_common_dosage_df['pert_meta_full'])
-retained_inst_info = inst_info.query('pert_id_meta in @most_common_dosages or pert_id == "DMSO"')
+retained_inst_info = inst_info.query('pert_id_meta in @most_common_dosages')
 retained_inst_ids = retained_inst_info.index
 
 inst_info_most_common = inst_info.loc[retained_inst_ids]
 inst_info_most_common.to_pickle(INST_INFO_MOST_COMMON_FILE)
-# assert retained_inst_info.shape[0] == most_common_dosage_df['count'].sum()
+assert retained_inst_info.shape[0] == most_common_dosage_df['count'].sum()
 
 
 def main(data, name):
@@ -32,7 +32,7 @@ def main(data, name):
     os.makedirs('data/processed/most_common_dosages', exist_ok=True)
     start = time()
     retained_data = data.loc[retained_inst_ids]
-    print(f"Filtering took {time() - start} seconds")
+    print(f"Filtering took {time() - start} seconds. Retaining {retained_data.shape[0]} samples.")
     retained_data.to_pickle(f'data/processed/most_common_dosages/{name}.pkl')
 
 

@@ -22,8 +22,10 @@ def impute_unit_mean(df, targets: pd.MultiIndex):
     targets = targets.sortlevel('unit')[0]
     units = Counter(targets.get_level_values('unit'))
     unit_means = df.groupby(level='unit').mean()
+    # if any target units *don't* have any samples in `df`, then use the average over all cells
     unit_means = fill_missing_means(unit_means, df.mean(), set(units) - set(unit_means.index))
 
+    # build an array to hold the correct number of copies of each unit mean
     imputed_data = np.zeros((len(targets), df.shape[1]))
     ix = 0
     for unit, num_ivs in units.items():
@@ -31,7 +33,7 @@ def impute_unit_mean(df, targets: pd.MultiIndex):
         ix += num_ivs
 
     imputed_df = pd.DataFrame(imputed_data, index=targets, columns=df.columns)
-    imputed_df.update(df)
+    # imputed_df.update(df)
 
     imputed_df.sort_index(inplace=True)
     return imputed_df
@@ -50,7 +52,7 @@ def impute_intervention_mean(df, targets: pd.MultiIndex):
         ix += num_units
 
     imputed_df = pd.DataFrame(imputed_data, index=targets, columns=df.columns)
-    imputed_df.update(df)
+    # imputed_df.update(df)
 
     imputed_df.sort_index(inplace=True)
     return imputed_df

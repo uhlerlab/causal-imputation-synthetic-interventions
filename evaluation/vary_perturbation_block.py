@@ -5,6 +5,14 @@ lp = LineProfiler()
 
 algs = []
 
+pm = PredictionManager(0, 0, 0, 0, name='old_data')
+em = EvaluationManager(pm)
+pm.predict(impute_unit_mean)
+pm.predict(impute_intervention_mean)
+pm.predict(impute_two_way_mean)
+em.boxplot()
+em.boxplot_per_intervention()
+
 
 for pert_start in [100, 500, 1000]:
     pm = PredictionManager(0, None, pert_start, pert_start+100, name='level2_common')

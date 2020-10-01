@@ -24,7 +24,14 @@ class PredictionManager:
         self.result_string = f'cell={cell_start}-{cell_stop},pert={pert_start}-{pert_stop},name={name},num_folds={num_folds}'
         self.result_folder = os.path.join('evaluation', 'results', self.result_string)
 
-        self.gene_expression_df, self.units, self.interventions, _ = get_data_block(cell_start, cell_stop, pert_start, pert_stop, name=name)
+        if name == 'old_data':
+            old_df0 = pd.read_csv('old_data/df0.csv', sep='\t', index_col=0)
+            old_df1 = pd.read_csv('old_data/df1_all.csv', sep='\t', index_col=0)
+            old_df = pd.concat([old_df0, old_df1])
+            old_df.set_index(['unit', 'intervention'], inplace=True)
+            self.gene_expression_df = old_df
+        else:
+            self.gene_expression_df, _, _ , _ = get_data_block(cell_start, cell_stop, pert_start, pert_stop, name=name)
         # sort so that DMSO comes first
         control_ixs = self.gene_expression_df.index.get_level_values('intervention') == "DMSO"
         num_control_profiles = control_ixs.sum()

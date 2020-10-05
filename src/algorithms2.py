@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from numpy.linalg import pinv
 import itertools as itr
 import ipdb
 from collections import Counter
@@ -7,6 +8,7 @@ from utils import get_index_dict, get_top_available
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 from functools import partial
+from sklearn.decomposition import TruncatedSVD
 
 
 def fill_missing_means(df, overall_mean, missing_ixs):
@@ -163,7 +165,7 @@ def synthetic_control_unit_inner(df, targets, regression_function, default_predi
     return predicted_df
 
 
-def predict_synthetic_control_unit(df, targets, num_desired_interventions, progress=False):
+def predict_synthetic_control_unit_ols(df, targets, num_desired_interventions, progress=False):
     regression_function = LinearRegression()
     default_predictor = partial(np.mean, axis=0)
     predicted_df = synthetic_control_unit_inner(
@@ -175,3 +177,62 @@ def predict_synthetic_control_unit(df, targets, num_desired_interventions, progr
         progress=progress
     )
     return predicted_df
+
+
+def predict_synthetic_control_unit_hsvt_ols(df, targets, num_desired_interventions, progress=False, center=True, energy=.99):
+    regression_function = HSVTRegressor(center=center, energy=energy)
+    default_predictor = partial(np.mean, axis=0)
+    predicted_df = synthetic_control_unit_inner(
+        df,
+        targets,
+        regression_function,
+        default_predictor,
+        num_desired_interventions,
+        progress=progress
+    )
+    return predicted_df
+
+
+def approximate_rank(spectra, energy):
+    spectra_sq = spectra ** 2
+    spectra_total_energy = spectra_sq.cumsum()
+    percent_energy = spectra_total_energy / spectra_total_energy[-1]
+    is_above = percent_energy > energy
+    rank = next((ix for ix, val in enumerate(is_above) if val)) + 1
+    return rank
+
+
+def hsvt(values, energy):
+    u, spectra, v = np.linalg.svd(values, full_matrices=False)
+    rank = approximate_rank(spectra, energy)
+    # print(rank)
+    return u[:, :rank], spectra[:rank], v[:rank]
+
+
+class HSVTRegressor:
+    def __init__(self, center=True, energy=.95):
+        self.center = center
+        self.energy = energy
+        self.coef_ = None
+        self.bias = None
+
+    def fit(self, source_values, target_values):
+        # each column should correspond to a single intervention
+        if self.center:
+            source_values = source_values - source_values.mean(axis=0)
+            self.bias = target_values.mean()
+            target_values = target_values - self.bias
+        u_mat, spectra, v_mat = hsvt(source_values, self.energy)
+        inv_source = (v_mat.T / spectra) @ u_mat.T
+        self.coef_ = inv_source @ target_values
+
+    def predict(self, source_values):
+        if self.center:
+            source_values = source_values - source_values.mean(axis=0)
+        u_mat, spectra, v_mat = hsvt(source_values, self.energy)
+        source_values = (u_mat*spectra) @ v_mat
+        res = source_values @ self.coef_
+        if self.center:
+            res += self.bias
+        return res
+

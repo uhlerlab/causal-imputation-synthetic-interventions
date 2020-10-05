@@ -1,10 +1,11 @@
 import pandas as pd
 import os
 import numpy as np
-from typing import List
+from typing import List, Optional
 from evaluation.helpers.get_data_block import get_data_block
 from tqdm import tqdm
 import ipdb
+
 
 BLACKLIST_KWARGS = {'verbose'}
 ADD_METRIC = True
@@ -13,15 +14,15 @@ ADD_METRIC = True
 class PredictionManager:
     def __init__(
             self,
-            cell_start,
-            cell_stop,
-            pert_start,
-            pert_stop,
+            cell_start: Optional[int] = None,
+            num_cells: int = 10,
+            pert_start: Optional[int] = None,
+            num_perts: int = 20,
             name='level2_filtered',
-            num_folds: int = 5,
+            num_folds: Optional[int] = 5,
             seed: int = 8838
     ):
-        self.result_string = f'cell={cell_start}-{cell_stop},pert={pert_start}-{pert_stop},name={name},num_folds={num_folds}'
+        self.result_string = f'cell={cell_start},{num_cells}cells,pert={pert_start},{num_perts}perts,name={name},num_folds={num_folds}'
         self.result_folder = os.path.join('evaluation', 'results', self.result_string)
 
         if name == 'old_data':
@@ -31,7 +32,13 @@ class PredictionManager:
             old_df.set_index(['unit', 'intervention'], inplace=True)
             self.gene_expression_df = old_df
         else:
-            self.gene_expression_df, _, _ , _ = get_data_block(cell_start, cell_stop, pert_start, pert_stop, name=name)
+            self.gene_expression_df, _, _ , _ = get_data_block(
+                num_cells=num_cells,
+                num_perts=num_perts,
+                cell_start=cell_start,
+                pert_start=pert_start,
+                name=name
+            )
         # sort so that DMSO comes first
         control_ixs = self.gene_expression_df.index.get_level_values('intervention') == "DMSO"
         num_control_profiles = control_ixs.sum()
@@ -41,8 +48,8 @@ class PredictionManager:
         np.random.seed(seed)
         num_profiles = self.gene_expression_df.shape[0]
         profile_ixs = list(range(num_control_profiles, num_profiles))
-        self.num_folds = num_folds
-        self.fold_test_ixs = np.array_split(np.random.permutation(profile_ixs), num_folds)
+        self.num_folds = num_folds if num_folds is not None else len(profile_ixs)
+        self.fold_test_ixs = np.array_split(np.random.permutation(profile_ixs), self.num_folds)
         self.fold_train_ixs = [
             list(range(num_control_profiles)) + list(set(profile_ixs) - set(test_ixs))
             for test_ixs in self.fold_test_ixs

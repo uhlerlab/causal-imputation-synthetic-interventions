@@ -17,9 +17,8 @@ alg_names = {
     'alg=impute_intervention_mean': 'Mean in Intervention',
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
-    'alg=predict_synthetic_control_unit,num_desired_interventions=1,progress=True': 'SCU-1',
-    'alg=predict_synthetic_control_unit,num_desired_interventions=3,progress=True': 'SCU-2',
-    'alg=predict_synthetic_control_unit,num_desired_interventions=None,progress=True': 'SCU-None',
+    'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None,progress=True': 'SCU-None',
+    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=True': 'SCU-hsvt-None',
 }
 
 
@@ -117,10 +116,11 @@ class EvaluationManager:
             boxColors,
             xlabel='Algorithm',
             ylabel='$R^2$ score per (cell type, intervention) pair',
-            title='Estimated Gene Expression',
+            title=self.prediction_manager.result_string,
             top=1,
             bottom=.5,
             scale=.03
         )
         os.makedirs('evaluation/plots', exist_ok=True)
+        plt.savefig(f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png')
         plt.savefig(f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png')

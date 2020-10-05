@@ -3,6 +3,7 @@ from typing import Optional
 import pandas as pd
 import itertools as itr
 import ipdb
+import random
 
 
 def remove_celltypes_no_control(
@@ -16,10 +17,10 @@ def remove_celltypes_no_control(
 
 
 def get_data_block(
-        cell_start: int,
-        cell_stop: Optional[int],
-        pert_start: int,
-        pert_stop: Optional[int],
+        num_cells: Optional[int] = 10,
+        num_perts: Optional[int] = 20,
+        cell_start: Optional[int] = None,
+        pert_start: Optional[int] = None,
         name='level2_filtered',
         common=True
 ):
@@ -32,10 +33,19 @@ def get_data_block(
         pert_ranks = load_pert_ranks()
         cell_ranks = load_cell_ranks()
 
-    cell_stop = cell_stop if cell_stop is not None else len(cell_ranks)
-    pert_stop = pert_stop if pert_stop is not None else len(pert_ranks)
-    cells = set(cell_ranks[cell_start:cell_stop].index)
-    perts = set(pert_ranks[pert_start:pert_stop].index) | {'DMSO'}
+    if cell_start is not None:
+        cell_stop = cell_start+num_cells if num_cells is not None else len(cell_ranks)
+        cells = set(cell_ranks[cell_start:cell_stop].index)
+    else:
+        random.seed(123)
+        cells = set(random.sample(list(cell_ranks.index), num_cells))
+
+    if pert_start is not None:
+        pert_stop = pert_start+num_perts if num_perts is not None else len(pert_ranks)
+        perts = set(pert_ranks[pert_start:pert_stop].index) | {'DMSO'}
+    else:
+        random.seed(123)
+        perts = set(random.sample(list(pert_ranks.index), num_perts)) | {'DMSO'}
 
     block = averages.query("cell_id in @cells and pert_id in @perts")
     block.index.rename(['unit', 'intervention'], inplace=True)

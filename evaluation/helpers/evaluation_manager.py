@@ -17,8 +17,11 @@ alg_names = {
     'alg=impute_intervention_mean': 'Mean in Intervention',
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
-    'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None,progress=True': 'SCU-None',
-    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=True': 'SCU-hsvt-None',
+    'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None': 'SI',
+    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.95': 'SI+hsvt,.95',
+    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.99': 'SI+hsvt,.99',
+    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.999': 'SI+hsvt,.999',
+    # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=False,energy=0.8': 'SI+hsvt,.8',
 }
 
 
@@ -43,23 +46,26 @@ class EvaluationManager:
 
     def r2(self):
         num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
-        num_rows = num_rows_per_alg * len(self.prediction_manager._predictions)
+        num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
         r2s = np.zeros(num_rows)
         index = []
 
         ix = 0
-        for alg, predicted_dfs in self.prediction_manager._predictions.items():
+        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
             print(f'[EvaluationManager.r2] computing r2 for {alg}')
-            for fold_ix, (test_ixs, predicted_df) in enumerate(zip(self.prediction_manager.fold_test_ixs, predicted_dfs)):
+            predicted_df = pd.read_pickle(prediction_filename)
+            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
                 # get test data that was held out in this fold
                 test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
-                assert (test_df.index == predicted_df.index).all()
+                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
+                predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
+                assert (test_df.index == predicted_df_fold.index).all()
 
                 # compute the R2 score for each gene expression profile
-                r2s[ix:(ix+predicted_df.shape[0])] = compute_r2_matrix(test_df.values, predicted_df.values)
-                units, ivs = predicted_df.index.get_level_values('unit'), predicted_df.index.get_level_values('intervention')
+                r2s[ix:(ix+predicted_df_fold.shape[0])] = compute_r2_matrix(test_df.values, predicted_df_fold.values)
+                units, ivs = predicted_df_fold.index.get_level_values('unit'), predicted_df_fold.index.get_level_values('intervention')
                 index.extend(list(zip(units, ivs, [fold_ix]*len(units), [alg]*len(units))))
-                ix += predicted_df.shape[0]
+                ix += predicted_df_fold.shape[0]
 
         res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
         return res
@@ -67,14 +73,17 @@ class EvaluationManager:
     def r2_per_iv(self):
         r2s = []
         index = []
-        for alg, predicted_dfs in self.prediction_manager._predictions.items():
+        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
             print(f'[EvaluationManager.r2_in_iv] computing r2 for {alg}')
-            for fold_ix, (test_ixs, predicted_df) in enumerate(zip(self.prediction_manager.fold_test_ixs, predicted_dfs)):
+            predicted_df = pd.read_pickle(prediction_filename)
+            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
                 test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
+                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
+
                 iv_ix_dict = test_df.groupby('intervention').indices
                 ivs = list(iv_ix_dict.keys())
                 test_values = test_df.values
-                predicted_values = predicted_df.values
+                predicted_values = predicted_df_fold.values
                 r = [
                     compute_r2_vector(test_values[iv_ix].flatten(), predicted_values[iv_ix].flatten())
                     for iv, iv_ix in iv_ix_dict.items()
@@ -84,9 +93,6 @@ class EvaluationManager:
 
         res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['intervention', 'fold_ix', 'alg']))
         return res
-
-    def mse(self):
-        alg2mse = dict()
 
     def boxplot(self):
         r2_df = self.r2()

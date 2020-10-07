@@ -5,9 +5,11 @@ from typing import List, Optional
 from evaluation.helpers.get_data_block import get_data_block
 from tqdm import tqdm
 import ipdb
+from multiprocessing import Pool, cpu_count
+from p_tqdm import p_map
 
 
-BLACKLIST_KWARGS = {'verbose'}
+BLACKLIST_KWARGS = {'verbose', 'multithread', 'overwrite', 'progress'}
 ADD_METRIC = True
 
 
@@ -15,15 +17,16 @@ class PredictionManager:
     def __init__(
             self,
             cell_start: Optional[int] = None,
-            num_cells: int = 10,
+            num_cells: Optional[int] = 10,
             pert_start: Optional[int] = None,
-            num_perts: int = 20,
+            num_perts: Optional[int] = 20,
             name='level2_filtered',
             num_folds: Optional[int] = 5,
             seed: int = 8838
     ):
         self.result_string = f'cell={cell_start},{num_cells}cells,pert={pert_start},{num_perts}perts,name={name},num_folds={num_folds}'
         self.result_folder = os.path.join('evaluation', 'results', self.result_string)
+        os.makedirs(self.result_folder, exist_ok=True)
 
         if name == 'old_data':
             old_df0 = pd.read_csv('old_data/df0.csv', sep='\t', index_col=0)
@@ -55,12 +58,13 @@ class PredictionManager:
             for test_ixs in self.fold_test_ixs
         ]
 
-        self._predictions = dict()
+        self.prediction_filenames = dict()
 
     def predict(
             self,
             alg,
             overwrite=False,
+            multithread=False,
             **kwargs
     ) -> List[pd.DataFrame]:
         """
@@ -81,34 +85,52 @@ class PredictionManager:
         kwarg_str = '' if not kwargs else ',' + ','.join(f'{k}={v}' for k, v in kwargs.items() if k not in BLACKLIST_KWARGS)
         full_alg_name = f'alg={alg.__name__}{kwarg_str}'
 
-        # simply return if the results are already loaded.
-        if self._predictions.get(full_alg_name) is not None:
-            return self._predictions[full_alg_name]
+        # filenames for the results of each fold
+        alg_results_filename = os.path.join(self.result_folder, full_alg_name + '.pkl')
+        self.prediction_filenames[full_alg_name] = alg_results_filename
+
+        # if results already exist, just load them
+        if not overwrite and os.path.exists(alg_results_filename):
+            print(f"[PredictionManager.predict] loading predictions for {full_alg_name}")
+            prediction_df = pd.read_pickle(alg_results_filename)
         else:
-            # filenames for the results of each fold
-            alg_results_folder = os.path.join(self.result_folder, full_alg_name)
-            os.makedirs(alg_results_folder, exist_ok=True)
-            result_filenames = [os.path.join(alg_results_folder, f'fold={k}.pkl') for k in range(self.num_folds)]
+            print(f"Predicting for {full_alg_name}")
 
-            # if results already exist, just load them
-            if not overwrite and os.path.exists(result_filenames[0]):
-                self._predictions[full_alg_name] = [pd.read_pickle(filename) for filename in result_filenames]
+            def run(p):
+                fold_ix, train_ixs, test_ixs = p
+                training_df = self.gene_expression_df.iloc[train_ixs]
+                targets = self.gene_expression_df.iloc[test_ixs].index
+                df = alg(training_df, targets, **kwargs)
+                df = df.loc[targets]
+                df['fold'] = [fold_ix]*df.shape[0]
+                df.set_index('fold', append=True, inplace=True)
+
+                return df
+
+            things = list(zip(range(self.num_folds), self.fold_train_ixs, self.fold_test_ixs))
+
+            if multithread:
+                with Pool(cpu_count()-1) as pool:
+                    prediction_dfs = p_map(run, things)
             else:
-                print(f"Predicting for {full_alg_name}")
+                prediction_dfs = list(tqdm((run(thing) for thing in things), total=len(things)))
 
-                # predict for each fold
-                self._predictions[full_alg_name] = []
-                for train_ixs, test_ixs, filename in tqdm(zip(self.fold_train_ixs, self.fold_test_ixs, result_filenames), total=self.num_folds):
-                    training_df = self.gene_expression_df.iloc[train_ixs]
-                    targets = self.gene_expression_df.iloc[test_ixs].index
-                    df = alg(training_df, targets, **kwargs)
-                    df = df.loc[targets]
+            # # predict for each fold
+            # predictions = []
+            # for train_ixs, test_ixs, filename in tqdm(things, total=self.num_folds):
+            #     training_df = self.gene_expression_df.iloc[train_ixs]
+            #     targets = self.gene_expression_df.iloc[test_ixs].index
+            #     df = alg(training_df, targets, **kwargs)
+            #     df = df.loc[targets]
+            #
+            #     # save the results
+            #     predictions.append(df)
+            #     df.to_pickle(filename)
 
-                    # save the results
-                    self._predictions[full_alg_name].append(df)
-                    df.to_pickle(filename)
+            prediction_df = pd.concat(prediction_dfs, axis=0)
+            prediction_df.to_pickle(alg_results_filename)
 
-            return self._predictions[full_alg_name]
+        return prediction_df
 
 
 

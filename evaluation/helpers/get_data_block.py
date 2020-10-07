@@ -33,6 +33,7 @@ def get_data_block(
         pert_ranks = load_pert_ranks()
         cell_ranks = load_cell_ranks()
 
+    num_cells = len(cell_ranks) if num_cells is None else num_cells
     if cell_start is not None:
         cell_stop = cell_start+num_cells if num_cells is not None else len(cell_ranks)
         cells = set(cell_ranks[cell_start:cell_stop].index)
@@ -40,6 +41,7 @@ def get_data_block(
         random.seed(123)
         cells = set(random.sample(list(cell_ranks.index), num_cells))
 
+    num_perts = len(pert_ranks) if num_perts is None else num_perts
     if pert_start is not None:
         pert_stop = pert_start+num_perts if num_perts is not None else len(pert_ranks)
         perts = set(pert_ranks[pert_start:pert_stop].index) | {'DMSO'}

@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.preprocessing import minmax_scale
 import ipdb
 import itertools as itr
+from collections import defaultdict
 
 
 def optional_str(s, predicate):
@@ -13,9 +14,12 @@ def pandas_minmax(df, axis):
 
 
 def get_index_dict(df, level):
-    levels = pd.DataFrame({level: df.index.get_level_values(level=level) for level in df.index.names})
-    other_level = (set(df.index.names) - {level}).pop()
-    return levels.groupby(level)[other_level].apply(set).to_dict()
+    d = defaultdict(set)
+    level_ix = df.index.names.index(level)
+    other_level_ix = 1 - level_ix
+    for entry in df.index:
+        d[entry[level_ix]].add(entry[other_level_ix])
+    return d
 
 
 def get_top_available(sorted_items: list, available_dict: dict, num_items_desired: int):

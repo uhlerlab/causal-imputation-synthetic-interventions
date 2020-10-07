@@ -3,29 +3,37 @@ import numpy as np
 from numpy.linalg import pinv
 import itertools as itr
 import ipdb
-from collections import Counter
+from collections import Counter, defaultdict
 from utils import get_index_dict, get_top_available
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 from functools import partial
 from sklearn.decomposition import TruncatedSVD
+from tensorly import partial_svd
+import itertools as itr
 
 
-def fill_missing_means(df, overall_mean, missing_ixs):
-    missing_df = pd.DataFrame(
-        np.tile(overall_mean.values, (len(missing_ixs), 1)),
-        index=missing_ixs,
-        columns=overall_mean.index
+def fill_missing_means(df, missing_ixs):
+    if len(missing_ixs) == 0:
+        return df
+
+    overall_mean = df.values.mean(axis=0)
+    new_data = np.tile(overall_mean, (len(missing_ixs), 1))
+    new_df = pd.DataFrame(
+        np.vstack((new_data, df.values)),
+        index=list(missing_ixs)+list(df.index),
+        columns=df.columns
     )
-    return df.append(missing_df)
+    return new_df
 
 
 def impute_unit_mean(df, targets: pd.MultiIndex):
     targets = targets.sortlevel('unit')[0]
     units = Counter(targets.get_level_values('unit'))
+
     unit_means = df.groupby(level='unit').mean()
     # if any target units *don't* have any samples in `df`, then use the average over all cells
-    unit_means = fill_missing_means(unit_means, df.mean(), set(units) - set(unit_means.index))
+    unit_means = fill_missing_means(unit_means, set(units) - set(unit_means.index))
 
     # build an array to hold the correct number of copies of each unit mean
     imputed_data = np.zeros((len(targets), df.shape[1]))
@@ -35,7 +43,6 @@ def impute_unit_mean(df, targets: pd.MultiIndex):
         ix += num_ivs
 
     imputed_df = pd.DataFrame(imputed_data, index=targets, columns=df.columns)
-    # imputed_df.update(df)
 
     imputed_df.sort_index(inplace=True)
     return imputed_df
@@ -45,7 +52,7 @@ def impute_intervention_mean(df, targets: pd.MultiIndex):
     targets = targets.sortlevel('intervention')[0]
     interventions = Counter(targets.get_level_values('intervention'))
     iv_means = df.groupby(level='intervention').mean()
-    iv_means = fill_missing_means(iv_means, df.mean(), set(interventions) - set(iv_means.index))
+    iv_means = fill_missing_means(iv_means, set(interventions) - set(iv_means.index))
 
     imputed_data = np.zeros((len(targets), df.shape[1]))
     ix = 0
@@ -68,12 +75,12 @@ def impute_two_way_mean(df, targets, lam=.5):
 
 
 def predict_intervention_fixed_effect(df, targets, control_intervention):
-    control_df = df.query('intervention == @control_intervention')
+    control_df = df[df.index.get_level_values('intervention') == control_intervention]
     control_df.reset_index(level='intervention', drop=True, inplace=True)
 
     target_units, target_ivs = zip(*targets)
     target_iv_set = set(target_ivs)
-    intervention_effects = df.query('intervention in @target_iv_set').subtract(control_df, level='unit')
+    intervention_effects = df[df.index.get_level_values('intervention').isin(target_iv_set)].subtract(control_df, level='unit')
     average_intervention_effects = intervention_effects.groupby('intervention').mean()
     missing_interventions = target_iv_set - set(average_intervention_effects.index.get_level_values('intervention'))
     if len(missing_interventions) > 0:
@@ -96,7 +103,7 @@ def predict_unit_fixed_effect(df, targets, control_unit):
 
 
 def find_donors(sorted_ivs, units2available_ivs, target_unit, target_intervention, num_desired_interventions=None):
-    sorted_training_ivs = (iv for iv in sorted_ivs.index if iv in units2available_ivs[target_unit])
+    sorted_training_ivs = (iv for iv in sorted_ivs if iv in units2available_ivs[target_unit])
     current_donors = [unit for unit, available_ivs in units2available_ivs.items() if target_intervention in available_ivs]
 
     source_interventions = set()
@@ -129,15 +136,18 @@ def synthetic_control_unit_inner(df, targets, regression_function, default_predi
     # make a dictionary mapping each unit to the `num_desired_interventions` most popular interventions, which will
     # be used as the "donor" interventions for learning weights
 
+    df = df.sort_index(level=['intervention', 'unit'])
+
     units2available_ivs = get_index_dict(df, 'unit')
-    sorted_ivs = df.groupby('intervention').size().sort_values(ascending=False)
+    c = Counter(df.index.get_level_values('intervention'))
+    sorted_ivs = [iv for iv, _ in c.most_common()]
 
     num_features = df.shape[1]
     predicted_data = np.zeros((len(targets), num_features))
     iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
     for ix, (target_unit, target_intervention) in iterator:
-        if target_intervention not in sorted_ivs.index:
-            target_source_values = df.query('unit == @target_unit').values
+        if target_intervention not in sorted_ivs:
+            target_source_values = df[df.index.get_level_values('unit') == target_unit].values
             prediction = default_predictor(target_source_values)
             predicted_data[ix] = prediction
         else:
@@ -145,21 +155,39 @@ def synthetic_control_unit_inner(df, targets, regression_function, default_predi
             donor_units, source_interventions = find_donors(sorted_ivs, units2available_ivs, target_unit, target_intervention, num_desired_interventions)
 
             # get donor source/target
-            donor_source = df.loc[[(unit, iv) for iv in source_interventions for unit in donor_units]]
+            donor_source = df[
+                df.index.get_level_values('unit').isin(donor_units) &
+                df.index.get_level_values('intervention').isin(source_interventions)
+            ]
+            # donor_source = donor_source.sort_index()  # 14%
             donor_source_values = donor_source.values.reshape(len(source_interventions), -1).T
             assert donor_source_values.shape == (num_features*len(donor_units), len(source_interventions))
-            donor_target = df.loc[[(unit, target_intervention) for unit in donor_units]]
+            donor_target = df[
+                df.index.get_level_values('unit').isin(donor_units) &
+                (df.index.get_level_values('intervention') == target_intervention)
+            ]
+            # donor_target = donor_target.sort_index()  # 10%
             donor_target_values = donor_target.values.flatten()
             assert donor_target_values.shape == (num_features*len(donor_units), )
 
             # perform regression
             regression_function.fit(donor_source_values, donor_target_values)
+            # print('donor source')
+            # print(donor_source)
+            # print('donor target')
+            # print(donor_target)
 
             # predict
-            target_source = df.loc[[(target_unit, iv) for iv in source_interventions]]
+            target_source = df[
+                (df.index.get_level_values('unit') == target_unit) &
+                (df.index.get_level_values('intervention').isin(source_interventions))
+            ]
+            # target_source = target_source.sort_index()  # 12%
             target_source_values = target_source.values.T
             prediction = regression_function.predict(target_source_values)
             predicted_data[ix] = prediction
+            # print('target source')
+            # print(target_source)
 
     predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
     return predicted_df

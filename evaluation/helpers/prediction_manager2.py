@@ -54,11 +54,13 @@ class PredictionManager:
         num_profiles = self.gene_expression_df.shape[0]
         profile_ixs = list(range(num_control_profiles, num_profiles))
         self.num_folds = num_folds if num_folds is not None else len(profile_ixs)
+        print(f"[PredictionManager.__init__] creating test/training indices")
         self.fold_test_ixs = np.array_split(np.random.permutation(profile_ixs), self.num_folds)
         self.fold_train_ixs = [
             list(range(num_control_profiles)) + list(set(profile_ixs) - set(test_ixs))
             for test_ixs in self.fold_test_ixs
         ]
+        print(f"[PredictionManager.__init__] done creating test/training indices")
 
         self.prediction_filenames = dict()
 

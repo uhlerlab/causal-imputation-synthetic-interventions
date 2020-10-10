@@ -25,7 +25,7 @@ def get_data_block(
         common=True,
         average=True
 ):
-    print("[get_data_block] loading averages")
+    print("[get_data_block] loading expressions")
     if average:
         expressions = pd.read_pickle(f'data/processed/averages/{name}.pkl')
     else:
@@ -54,7 +54,12 @@ def get_data_block(
         random.seed(123)
         perts = set(random.sample(list(pert_ranks.index), num_perts)) | {'DMSO'}
 
-    block = expressions.query("cell_id in @cells and pert_id in @perts")
+    print("[get_data_block] Filtering")
+    block = expressions[
+        expressions.index.get_level_values('cell_id').isin(cells) &
+        expressions.index.get_level_values('pert_id').isin(perts)
+    ]
+    print("[get_data_block] Done filtering")
     block.index.rename(['unit', 'intervention'], inplace=True)
     missing = pd.MultiIndex.from_tuples(set(itr.product(cells, perts)) - set(block.index), names=['unit', 'intervention'])
     return block, cells, perts, missing

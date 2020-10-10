@@ -41,3 +41,6 @@ cd ..
 
 # must filter institution info to match gene expression data
 python filter_inst_info.py
+
+wget ftp://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi_lite.owl.gz
+gunzip chebi_lite.owl.gz

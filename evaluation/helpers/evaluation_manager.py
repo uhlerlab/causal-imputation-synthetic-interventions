@@ -12,15 +12,16 @@ sns.set()
 boxColors = ['#addd8e', '#31a354', '#7fcdbb', '#2c7fb8',
              '#feb24c', '#f03b20', '#c51b8a', '#756bb1']
 
+energy = 0.9
 alg_names = {
     'alg=impute_unit_mean': 'Mean in Unit',
     'alg=impute_intervention_mean': 'Mean in Intervention',
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
     'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None': 'SI',
-    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.95': 'SI+hsvt,.95',
-    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.99': 'SI+hsvt,.99',
-    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
+    f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=True': f'SI+hsvt,{energy},test',
+    f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=False': f'SI+hsvt,{energy}',
+    # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=False,energy=0.8': 'SI+hsvt,.8',
 }
 
@@ -104,13 +105,15 @@ class EvaluationManager:
             boxColors,
             xlabel='Algorithm',
             ylabel='$R^2$ score per (cell type, intervention) pair',
-            title='Estimated Gene Expression',
+            title=self.prediction_manager.result_string,
             top=1,
             bottom=.5,
             scale=.03
         )
         os.makedirs('evaluation/plots', exist_ok=True)
-        plt.savefig(f'evaluation/plots/boxplot_{self.prediction_manager.result_string}.png')
+        filename = f'evaluation/plots/boxplot_{self.prediction_manager.result_string}.png'
+        plt.savefig(filename)
+        print(f"Saved to {os.path.abspath(filename)}")
 
     def boxplot_per_intervention(self):
         r2_df = self.r2_per_iv()
@@ -128,5 +131,6 @@ class EvaluationManager:
             scale=.03
         )
         os.makedirs('evaluation/plots', exist_ok=True)
-        plt.savefig(f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png')
-        plt.savefig(f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png')
+        filename = f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png'
+        plt.savefig(filename)
+        print(f"Saved to {os.path.abspath(filename)}")

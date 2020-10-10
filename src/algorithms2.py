@@ -145,6 +145,7 @@ def synthetic_control_unit_inner(df, targets, regression_function, default_predi
     num_features = df.shape[1]
     predicted_data = np.zeros((len(targets), num_features))
     iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
+    rejection_counter = 0
     for ix, (target_unit, target_intervention) in iterator:
         if target_intervention not in sorted_ivs:
             target_source_values = df[df.index.get_level_values('unit') == target_unit].values
@@ -184,11 +185,19 @@ def synthetic_control_unit_inner(df, targets, regression_function, default_predi
             ]
             # target_source = target_source.sort_index()  # 12%
             target_source_values = target_source.values.T
-            prediction = regression_function.predict(target_source_values)
+
+            try:
+                prediction = regression_function.predict(target_source_values)
+            except RejectionError:
+                all_target_source_values = df[df.index.get_level_values('unit') == target_unit].values
+                prediction = default_predictor(all_target_source_values)
+                rejection_counter += 1
+
             predicted_data[ix] = prediction
             # print('target source')
             # print(target_source)
 
+    print(f"Rejected: {rejection_counter} out of {len(targets)}")
     predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
     return predicted_df
 
@@ -207,8 +216,18 @@ def predict_synthetic_control_unit_ols(df, targets, num_desired_interventions, p
     return predicted_df
 
 
-def predict_synthetic_control_unit_hsvt_ols(df, targets, num_desired_interventions, progress=False, center=True, energy=.99):
-    regression_function = HSVTRegressor(center=center, energy=energy)
+def predict_synthetic_control_unit_hsvt_ols(
+        df,
+        targets,
+        num_desired_interventions,
+        progress=False,
+        center=True,
+        energy=.99,
+        hypo_test=True,
+        sig_level=.05,
+        stat_coef=1
+):
+    regression_function = HSVTRegressor(center=center, energy=energy, sig_level=sig_level, hypo_test=hypo_test, stat_coef=1)
     default_predictor = partial(np.mean, axis=0)
     predicted_df = synthetic_control_unit_inner(
         df,
@@ -237,15 +256,10 @@ def hsvt(values, energy):
     return u[:, :rank], spectra[:rank], v[:rank]
 
 
-def critical_value(c_, r_pre, n_d, t_, alpha):
+def critical_value(c_, r_pre, num_donor_units, num_dimensions, alpha):
+    n_d = num_donor_units
+    t_ = num_dimensions
     return c_ * (r_pre / min(n_d, t_) + r_pre * np.log2(1 / alpha) / n_d / t_)
-
-
-def c_prime(c, sigma2, gamma, K):
-    # sigma2: variance bound on sub-Gaussian errors
-    # gamma: bound on covariance matrix of sub-Gaussian errors
-    # K: psi2 bound on sub-Gaussian errors
-    return c * (1 + sigma2) * (1 + gamma**2) + (1 + K**2)
 
 
 # check if row space of X2 lies within row space of X1 (look at right singular vectors)
@@ -259,15 +273,18 @@ def projection_stat(v1, v2):
 
 
 class HSVTRegressor:
-    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True):
+    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, stat_coef=1):
         self.center = center
         self.energy = energy
         self.coef_ = None
         self.bias = None
 
+        # parameters needed for hypothesis test
         self.sig_level = sig_level
         self.hypo_test = hypo_test
+        self.stat_coef = stat_coef
         self.vmat_source = None
+        self.num_donor_units = None
 
     def fit(self, source_values, target_values):
         # each column should correspond to a single intervention
@@ -279,7 +296,7 @@ class HSVTRegressor:
         u_mat, spectra, v_mat = hsvt(source_values, self.energy)
         if self.hypo_test:
             self.vmat_source = v_mat
-            print('source', v_mat.shape)
+            self.num_donor_units = source_values.shape[1]
 
         inv_source = (v_mat.T / spectra) @ u_mat.T
         self.coef_ = inv_source @ target_values
@@ -288,13 +305,13 @@ class HSVTRegressor:
         if self.center:
             source_values = source_values - source_values.mean(axis=0)
         u_mat, spectra, v_mat = hsvt(source_values, self.energy)
-        print('target', v_mat.shape)
 
         if self.hypo_test:
             stat = projection_stat(self.vmat_source, v_mat)
-            t = None
-            # critval = critical_value(1, self.r_pre, source_values.shape[1], t, self.alpha)
-            print(stat)
+            num_dimensions = source_values.shape[0]
+            critval = critical_value(self.stat_coef, self.vmat_source.shape[0], self.num_donor_units, num_dimensions, self.sig_level)
+            if stat > critval:
+                raise RejectionError
 
         source_values = (u_mat*spectra) @ v_mat
         res = source_values @ self.coef_
@@ -302,3 +319,6 @@ class HSVTRegressor:
             res += self.bias
         return res
 
+
+class RejectionError(Exception):
+    pass

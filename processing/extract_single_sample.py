@@ -1,19 +1,29 @@
 from time import time
 from sklearn.utils import shuffle
 import os
+from utils import pandas_minmax, optional_str
+import numpy as np
 
 os.makedirs('data/processed/single_samples/', exist_ok=True)
 
 random_state = 231321
 
 
-def main(data, name):
+def main(data, name, log2=False, minmax=False):
     start = time()
+
+    if log2:
+        print("[processing/create_averages] Log2")
+        data = np.log2(data+1)
+    if minmax:
+        print("[processing/create_averages] Minmax")
+        data = pandas_minmax(data, axis=1)
+
     shuffled_data = shuffle(data, random_state=random_state)
     random_data = shuffled_data.groupby(level=['cell_id', 'pert_id']).first()
     print(f"Took {time() - start} seconds to sample")
 
-    random_data.to_pickle(f"data/processed/single_samples/{name}.pkl")
+    random_data.to_pickle(f"data/processed/single_samples/{name}{optional_str('_log2', log2)}{optional_str('_minmax', minmax)}.pkl")
 
 
 if __name__ == '__main__':
@@ -34,4 +44,4 @@ if __name__ == '__main__':
 
     for name, data_loader in files.items():
         data = data_loader()
-        main(data, name)
+        main(data, name, log2=True, minmax=True)

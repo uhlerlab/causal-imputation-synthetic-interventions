@@ -237,12 +237,37 @@ def hsvt(values, energy):
     return u[:, :rank], spectra[:rank], v[:rank]
 
 
+def critical_value(c_, r_pre, n_d, t_, alpha):
+    return c_ * (r_pre / min(n_d, t_) + r_pre * np.log2(1 / alpha) / n_d / t_)
+
+
+def c_prime(c, sigma2, gamma, K):
+    # sigma2: variance bound on sub-Gaussian errors
+    # gamma: bound on covariance matrix of sub-Gaussian errors
+    # K: psi2 bound on sub-Gaussian errors
+    return c * (1 + sigma2) * (1 + gamma**2) + (1 + K**2)
+
+
+# check if row space of X2 lies within row space of X1 (look at right singular vectors)
+def projection_stat(v1, v2):
+    # training projection matrix
+    P = v1.T @ v1
+
+    # gap in subspaces
+    delta = v2 @ P - v2
+    return np.linalg.norm(delta, 'fro') ** 2
+
+
 class HSVTRegressor:
-    def __init__(self, center=True, energy=.95):
+    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True):
         self.center = center
         self.energy = energy
         self.coef_ = None
         self.bias = None
+
+        self.sig_level = sig_level
+        self.hypo_test = hypo_test
+        self.vmat_source = None
 
     def fit(self, source_values, target_values):
         # each column should correspond to a single intervention
@@ -250,7 +275,12 @@ class HSVTRegressor:
             source_values = source_values - source_values.mean(axis=0)
             self.bias = target_values.mean()
             target_values = target_values - self.bias
+
         u_mat, spectra, v_mat = hsvt(source_values, self.energy)
+        if self.hypo_test:
+            self.vmat_source = v_mat
+            print('source', v_mat.shape)
+
         inv_source = (v_mat.T / spectra) @ u_mat.T
         self.coef_ = inv_source @ target_values
 
@@ -258,6 +288,14 @@ class HSVTRegressor:
         if self.center:
             source_values = source_values - source_values.mean(axis=0)
         u_mat, spectra, v_mat = hsvt(source_values, self.energy)
+        print('target', v_mat.shape)
+
+        if self.hypo_test:
+            stat = projection_stat(self.vmat_source, v_mat)
+            t = None
+            # critval = critical_value(1, self.r_pre, source_values.shape[1], t, self.alpha)
+            print(stat)
+
         source_values = (u_mat*spectra) @ v_mat
         res = source_values @ self.coef_
         if self.center:

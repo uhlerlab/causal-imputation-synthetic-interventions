@@ -16,8 +16,8 @@ def main(data, name, log2=False, minmax=False):
     if minmax:
         print("[processing/create_averages] Minmax")
         data = pandas_minmax(data, axis=1)
-        print("[processing/create_averages] Mean")
 
+    print("[processing/create_averages] Mean")
     means = data.groupby(level=['cell_id', PERT_ID_FIELD]).mean()
     print("[processing/create_averages] Saving")
     means.to_pickle(f"data/processed/averages/{name}{optional_str('_log2', log2)}{optional_str('_minmax', minmax)}.pkl")

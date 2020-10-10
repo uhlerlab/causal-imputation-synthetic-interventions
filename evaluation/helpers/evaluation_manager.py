@@ -20,7 +20,7 @@ alg_names = {
     'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None': 'SI',
     'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.95': 'SI+hsvt,.95',
     'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.99': 'SI+hsvt,.99',
-    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.999': 'SI+hsvt,.999',
+    'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=False,energy=0.8': 'SI+hsvt,.8',
 }
 

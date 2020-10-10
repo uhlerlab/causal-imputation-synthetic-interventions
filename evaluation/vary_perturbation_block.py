@@ -19,18 +19,20 @@ algs = []
 def run(name):
     for pert_start in [0]:
         pm = PredictionManager(
-            num_cells=None,
+            num_cells=10,
             num_perts=100,
             name=name,
-            num_folds=None
+            num_folds=None,
+            average=False
         )
         pm.predict(impute_unit_mean, overwrite=False)
         pm.predict(impute_intervention_mean, overwrite=False)
         pm.predict(impute_two_way_mean)
         pm.predict(predict_intervention_fixed_effect, control_intervention='DMSO', overwrite=False)
         pm.predict(predict_synthetic_control_unit_ols, num_desired_interventions=None, progress=False, overwrite=False)
-        pm.predict(predict_synthetic_control_unit_hsvt_ols, num_desired_interventions=None, progress=False, overwrite=True, energy=.999, multithread=False)
-        pm.predict(predict_synthetic_control_unit_hsvt_ols, num_desired_interventions=None, progress=False, overwrite=True, energy=.99, multithread=False)
+        # pm.predict(predict_synthetic_control_unit_hsvt_ols, num_desired_interventions=None, progress=False, overwrite=True, energy=.999, multithread=False)
+        # pm.predict(predict_synthetic_control_unit_hsvt_ols, num_desired_interventions=None, progress=False, overwrite=True, energy=.99, multithread=False)
+        pm.predict(predict_synthetic_control_unit_hsvt_ols, num_desired_interventions=None, progress=False, overwrite=False, energy=.8, multithread=False)
         pm.predict(predict_synthetic_control_unit_hsvt_ols, num_desired_interventions=None, progress=False, overwrite=True, energy=.95, multithread=False)
 
         em = EvaluationManager(pm)
@@ -46,8 +48,8 @@ if __name__ == '__main__':
     # lp.add_function(synthetic_control_unit_inner)
     # lp.runcall(run, 'level2_common')
     # lp.print_stats()
-    run('level2_filtered_common')
+    # run('level2_filtered_common')
     # run('level2')
     # run('level2_filtered')
     # run('level2_filtered_log2_minmax')
-    # run('level2_filtered_common_log2_minmax')
+    run('level2_filtered_common_log2_minmax')

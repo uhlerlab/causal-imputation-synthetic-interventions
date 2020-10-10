@@ -20,11 +20,12 @@ class PredictionManager:
             num_cells: Optional[int] = 10,
             pert_start: Optional[int] = None,
             num_perts: Optional[int] = 20,
+            average: bool = True,
             name='level2_filtered',
             num_folds: Optional[int] = 5,
             seed: int = 8838
     ):
-        self.result_string = f'cell={cell_start},{num_cells}cells,pert={pert_start},{num_perts}perts,name={name},num_folds={num_folds}'
+        self.result_string = f'cell={cell_start},{num_cells}cells,pert={pert_start},{num_perts}perts,name={name},num_folds={num_folds},average={average}'
         self.result_folder = os.path.join('evaluation', 'results', self.result_string)
         os.makedirs(self.result_folder, exist_ok=True)
 
@@ -40,7 +41,8 @@ class PredictionManager:
                 num_perts=num_perts,
                 cell_start=cell_start,
                 pert_start=pert_start,
-                name=name
+                name=name,
+                average=average
             )
         # sort so that DMSO comes first
         control_ixs = self.gene_expression_df.index.get_level_values('intervention') == "DMSO"

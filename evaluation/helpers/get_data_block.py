@@ -22,10 +22,15 @@ def get_data_block(
         cell_start: Optional[int] = None,
         pert_start: Optional[int] = None,
         name='level2_filtered',
-        common=True
+        common=True,
+        average=True
 ):
     print("[get_data_block] loading averages")
-    averages = pd.read_pickle(f'data/processed/averages/{name}.pkl')
+    if average:
+        expressions = pd.read_pickle(f'data/processed/averages/{name}.pkl')
+    else:
+        expressions = pd.read_pickle(f'data/processed/single_samples/{name}.pkl')
+
     if common:
         pert_ranks = load_pert_ranks_common()
         cell_ranks = load_cell_ranks_common()
@@ -49,7 +54,7 @@ def get_data_block(
         random.seed(123)
         perts = set(random.sample(list(pert_ranks.index), num_perts)) | {'DMSO'}
 
-    block = averages.query("cell_id in @cells and pert_id in @perts")
+    block = expressions.query("cell_id in @cells and pert_id in @perts")
     block.index.rename(['unit', 'intervention'], inplace=True)
     missing = pd.MultiIndex.from_tuples(set(itr.product(cells, perts)) - set(block.index), names=['unit', 'intervention'])
     return block, cells, perts, missing

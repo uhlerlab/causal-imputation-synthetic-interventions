@@ -20,3 +20,6 @@ python3 processing/create_rank_files.py
 
 # (5) create files containing the average gene expression vectors for each cell_id/pert_id pair
 python3 processing/create_averages.py
+
+# (5) create files containing the average gene expression vectors for each cell_id/pert_id pair
+python3 processing/extract_single_samples.py

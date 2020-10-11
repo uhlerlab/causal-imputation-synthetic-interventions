@@ -109,6 +109,7 @@ class PredictionManager:
                 df['fold'] = [fold_ix]*df.shape[0]
                 df.set_index('fold', append=True, inplace=True)
 
+                assert df.shape == (len(test_ixs), training_df.shape[1])
                 return df
 
             things = list(zip(range(self.num_folds), self.fold_train_ixs, self.fold_test_ixs))
@@ -118,18 +119,6 @@ class PredictionManager:
                     prediction_dfs = p_map(run, things)
             else:
                 prediction_dfs = list(tqdm((run(thing) for thing in things), total=len(things)))
-
-            # # predict for each fold
-            # predictions = []
-            # for train_ixs, test_ixs, filename in tqdm(things, total=self.num_folds):
-            #     training_df = self.gene_expression_df.iloc[train_ixs]
-            #     targets = self.gene_expression_df.iloc[test_ixs].index
-            #     df = alg(training_df, targets, **kwargs)
-            #     df = df.loc[targets]
-            #
-            #     # save the results
-            #     predictions.append(df)
-            #     df.to_pickle(filename)
 
             prediction_df = pd.concat(prediction_dfs, axis=0)
             prediction_df.to_pickle(alg_results_filename)

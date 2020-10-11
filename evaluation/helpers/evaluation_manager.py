@@ -1,4 +1,4 @@
-from evaluation.helpers.prediction_manager2 import PredictionManager
+from evaluation.helpers.prediction_manager import PredictionManager
 import pandas as pd
 import ipdb
 import matplotlib.pyplot as plt
@@ -18,9 +18,8 @@ alg_names = {
     'alg=impute_intervention_mean': 'Mean in Intervention',
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
-    'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None': 'SI',
-    f'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None,donor_dim=intervention': f'SI-intervention',
-    f'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None,donor_dim=unit': f'SI-unit',
+    f'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=intervention': f'SI-intervention',
+    f'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit': f'SI-unit',
     # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=True,hypo_test_percent=0.1': f'SI+hsvt,{energy},test',
     # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=False': f'SI+hsvt,{energy}',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
@@ -63,6 +62,9 @@ class EvaluationManager:
                 predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
                 predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
                 assert (test_df.index == predicted_df_fold.index).all()
+
+                if alg == 'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit':
+                    ipdb.set_trace()
 
                 # compute the R2 score for each gene expression profile
                 r2s[ix:(ix+predicted_df_fold.shape[0])] = compute_r2_matrix(test_df.values, predicted_df_fold.values)

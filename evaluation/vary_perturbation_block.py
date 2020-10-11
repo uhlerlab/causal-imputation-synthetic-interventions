@@ -19,7 +19,7 @@ algs = []
 def run(name, average, num_perts):
     for pert_start in [0]:
         pm = PredictionManager(
-            num_cells=None,
+            num_cells=2,
             num_perts=num_perts,
             name=name,
             num_folds=None,
@@ -29,8 +29,8 @@ def run(name, average, num_perts):
         pm.predict(impute_intervention_mean, overwrite=False)
         pm.predict(impute_two_way_mean)
         pm.predict(predict_intervention_fixed_effect, control_intervention='DMSO', overwrite=False)
-        pm.predict(predict_synthetic_intervention_ols, num_desired_interventions=None, progress=False, overwrite=False, donor_dim='intervention')
-        pm.predict(predict_synthetic_intervention_ols, num_desired_interventions=None, progress=False, overwrite=False, donor_dim='unit')
+        pm.predict(predict_synthetic_intervention_ols, num_desired_interventions=None, progress=False, overwrite=True, donor_dim='intervention')
+        # pm.predict(predict_synthetic_intervention_ols, num_desired_interventions=None, progress=False, overwrite=True, donor_dim='unit')
         # energy = .95
         # pm.predict(
         #     predict_synthetic_intervention_hsvt_ols,
@@ -60,6 +60,8 @@ def run(name, average, num_perts):
         em.boxplot()
         em.boxplot_per_intervention()
 
+        return r
+
 
 if __name__ == '__main__':
     # lp.add_function(predict_synthetic_control_unit_ols)
@@ -69,7 +71,7 @@ if __name__ == '__main__':
     # run('level2_filtered_common')
     import itertools as itr
 
-    run('level2', average=True, num_perts=100)
+    r2 = run('level2', average=True, num_perts=5)
 
     # for average, num_perts in itr.product([True, False], [100]):
     #     run('level2', average=average, num_perts=num_perts)

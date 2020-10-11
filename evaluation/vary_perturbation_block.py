@@ -1,7 +1,7 @@
 from evaluation.helpers import PredictionManager, EvaluationManager
-from src.algorithms2 import impute_unit_mean, impute_intervention_mean, impute_two_way_mean
-from src.algorithms2 import predict_intervention_fixed_effect, predict_synthetic_control_unit_ols, predict_synthetic_control_unit_hsvt_ols
-from src.algorithms2 import HSVTRegressor, synthetic_control_unit_inner, hsvt, approximate_rank, fill_missing_means
+from src.algorithms import impute_unit_mean, impute_intervention_mean, impute_two_way_mean
+from src.algorithms import predict_intervention_fixed_effect, predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
+from src.algorithms import HSVTRegressor, synthetic_intervention_inner, hsvt, approximate_rank, fill_missing_means
 from line_profiler import LineProfiler
 lp = LineProfiler()
 
@@ -29,27 +29,28 @@ def run(name, average, num_perts):
         pm.predict(impute_intervention_mean, overwrite=False)
         pm.predict(impute_two_way_mean)
         pm.predict(predict_intervention_fixed_effect, control_intervention='DMSO', overwrite=False)
-        pm.predict(predict_synthetic_control_unit_ols, num_desired_interventions=None, progress=False, overwrite=False)
-        energy = .95
-        pm.predict(
-            predict_synthetic_control_unit_hsvt_ols,
-            num_desired_interventions=None,
-            energy=energy,
-            hypo_test=True,
-            hypo_test_percent=.1,
-            progress=False,
-            overwrite=None,
-            multithread=False
-        )
-        pm.predict(
-            predict_synthetic_control_unit_hsvt_ols,
-            num_desired_interventions=None,
-            energy=energy,
-            hypo_test=False,
-            progress=False,
-            overwrite=False,
-            multithread=False
-        )
+        pm.predict(predict_synthetic_intervention_ols, num_desired_interventions=None, progress=False, overwrite=False, donor_dim='intervention')
+        pm.predict(predict_synthetic_intervention_ols, num_desired_interventions=None, progress=False, overwrite=False, donor_dim='unit')
+        # energy = .95
+        # pm.predict(
+        #     predict_synthetic_intervention_hsvt_ols,
+        #     num_desired_interventions=None,
+        #     energy=energy,
+        #     hypo_test=True,
+        #     hypo_test_percent=.1,
+        #     progress=False,
+        #     overwrite=True,
+        #     multithread=False
+        # )
+        # pm.predict(
+        #     predict_synthetic_intervention_hsvt_ols,
+        #     num_desired_interventions=None,
+        #     energy=energy,
+        #     hypo_test=False,
+        #     progress=False,
+        #     overwrite=False,
+        #     multithread=False
+        # )
 
         em = EvaluationManager(pm)
         r = em.r2()

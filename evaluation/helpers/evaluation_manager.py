@@ -19,8 +19,10 @@ alg_names = {
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
     'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None': 'SI',
-    f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=True,hypo_test_percent=0.1': f'SI+hsvt,{energy},test',
-    f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=False': f'SI+hsvt,{energy}',
+    f'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None,donor_dim=intervention': f'SI-intervention',
+    f'alg=predict_synthetic_control_unit_ols,num_desired_interventions=None,donor_dim=unit': f'SI-unit',
+    # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=True,hypo_test_percent=0.1': f'SI+hsvt,{energy},test',
+    # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=False': f'SI+hsvt,{energy}',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=False,energy=0.8': 'SI+hsvt,.8',
 }

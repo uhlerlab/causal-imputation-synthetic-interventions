@@ -6,12 +6,6 @@ def spectral_energy(s):
     return 100 * (s ** 2).cumsum() / (s ** 2).sum()
 
 
-# center columns of data
-def center_data(X):
-    a = X.mean(axis=0)
-    return X - a, a
-
-
 # compute approximate rank of matrix
 def approximate_rank(X, t=0.99):
     """
@@ -49,18 +43,3 @@ def approximate_rank2(X, t=0):
     return rank
 
 
-# hard singular value thresholding (hsvt)
-def hsvt(X, rank=2):
-    """
-    Input:
-        X: donor data (#samples x #donor units)
-        rank: #singular values of X to retain
-
-    Output:
-        low rank approximateion of X
-    """
-    if rank is None:
-        return X
-    u, s, v = np.linalg.svd(X, full_matrices=False)
-    s[rank:].fill(0)
-    return np.dot(u * s, v)

@@ -133,6 +133,87 @@ def find_donors(sorted_ivs, units2available_ivs, target_unit, target_interventio
     return current_donors, source_interventions
 
 
+def synthetic_intervention_inner(
+        df,
+        targets,
+        regression_function,
+        default_predictor,
+        donor_dim='intervention',
+        num_desired_interventions=None,
+        progress=False
+):
+    assert donor_dim == 'intervention' or donor_dim == 'unit'
+    training_dim = 'unit' if donor_dim == 'intervention' else 'unit'
+
+    df = df.sort_index(level=[donor_dim, training_dim])
+
+    training2available_donors = get_index_dict(df, training_dim)
+    c = Counter(df.index.get_level_values(donor_dim))
+    sorted_donors = [donor for donor, _ in c.most_common()]
+
+    num_features = df.shape[1]
+    predicted_data = np.zeros((len(targets), num_features))
+    iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
+    rejection_counter = 0
+    for ix, (target_unit, target_intervention) in iterator:
+        target_donor_ix = target_intervention if donor_dim == 'intervention' else 'unit'
+        target_training_ix = target_unit if donor_dim == 'intervention' else 'unit'
+
+        if target_donor_ix not in sorted_donors:
+            target_source_values = df[df.index.get_level_values(training_dim) == target_training_ix].values
+            prediction = default_predictor(target_source_values)
+            predicted_data[ix] = prediction
+        else:
+            # find donor units
+            training_ixs, donor_ixs = find_donors(
+                sorted_donors,
+                training2available_donors,
+                target_training_ix,
+                target_donor_ix,
+                num_desired_interventions
+            )
+
+            # get donor source/target
+            donor_source = df[
+                df.index.get_level_values(training_dim).isin(training_ixs) &
+                df.index.get_level_values(donor_dim).isin(donor_ixs)
+            ]
+            # donor_source = donor_source.sort_index()  # 14%
+            donor_source_values = donor_source.values.reshape(len(donor_ixs), -1).T
+            assert donor_source_values.shape == (num_features*len(training_ixs), len(donor_ixs))
+            donor_target = df[
+                df.index.get_level_values(training_dim).isin(training_ixs) &
+                (df.index.get_level_values(donor_dim) == target_donor_ix)
+            ]
+            # donor_target = donor_target.sort_index()  # 10%
+            donor_target_values = donor_target.values.flatten()
+            assert donor_target_values.shape == (num_features*len(training_dim), )
+
+            # perform regression
+            regression_function.fit(donor_source_values, donor_target_values)
+
+            # predict
+            target_source = df[
+                (df.index.get_level_values(training_dim) == target_training_ix) &
+                (df.index.get_level_values(donor_dim).isin(donor_ixs))
+            ]
+            # target_source = target_source.sort_index()  # 12%
+            target_source_values = target_source.values.T
+
+            try:
+                prediction = regression_function.predict(target_source_values)
+            except RejectionError:
+                all_target_source_values = df[df.index.get_level_values(training_dim) == target_training_ix].values
+                prediction = default_predictor(all_target_source_values)
+                rejection_counter += 1
+
+            predicted_data[ix] = prediction
+
+    print(f"Rejected: {rejection_counter} out of {len(targets)}")
+    predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
+    return predicted_df
+
+
 def synthetic_control_unit_inner(df, targets, regression_function, default_predictor, num_desired_interventions=None, progress=False):
     # make a dictionary mapping each unit to the `num_desired_interventions` most popular interventions, which will
     # be used as the "donor" interventions for learning weights
@@ -206,7 +287,7 @@ def synthetic_control_unit_inner(df, targets, regression_function, default_predi
 def predict_synthetic_control_unit_ols(df, targets, num_desired_interventions, progress=False):
     regression_function = LinearRegression()
     default_predictor = partial(np.mean, axis=0)
-    predicted_df = synthetic_control_unit_inner(
+    predicted_df = synthetic_intervention_inner(
         df,
         targets,
         regression_function,
@@ -230,7 +311,7 @@ def predict_synthetic_control_unit_hsvt_ols(
 ):
     regression_function = HSVTRegressor(center=center, energy=energy, sig_level=sig_level, hypo_test=hypo_test, hypo_test_percent=hypo_test_percent)
     default_predictor = partial(np.mean, axis=0)
-    predicted_df = synthetic_control_unit_inner(
+    predicted_df = synthetic_intervention_inner(
         df,
         targets,
         regression_function,

@@ -7,6 +7,7 @@ from tqdm import tqdm
 import ipdb
 from multiprocessing import Pool, cpu_count
 from p_tqdm import p_map
+from src.algorithms import predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
 
 
 BLACKLIST_KWARGS = {'verbose', 'multithread', 'overwrite', 'progress'}
@@ -44,6 +45,8 @@ class PredictionManager:
                 name=name,
                 average=average
             )
+        print(self.gene_expression_df.groupby('intervention').size().sort_values(ascending=False))
+        print(self.gene_expression_df.groupby('unit').size().sort_values(ascending=False))
         # sort so that DMSO comes first
         control_ixs = self.gene_expression_df.index.get_level_values('intervention') == "DMSO"
         num_control_profiles = control_ixs.sum()
@@ -91,6 +94,7 @@ class PredictionManager:
 
         # filenames for the results of each fold
         alg_results_filename = os.path.join(self.result_folder, full_alg_name + '.pkl')
+        alg_stats_filename = os.path.join(self.result_folder, full_alg_name + '_stats.pkl')
         self.prediction_filenames[full_alg_name] = alg_results_filename
 
         # if results already exist, just load them
@@ -104,24 +108,43 @@ class PredictionManager:
                 fold_ix, train_ixs, test_ixs = p
                 training_df = self.gene_expression_df.iloc[train_ixs]
                 targets = self.gene_expression_df.iloc[test_ixs].index
-                df = alg(training_df, targets, **kwargs)
-                df = df.loc[targets]
-                df['fold'] = [fold_ix]*df.shape[0]
-                df.set_index('fold', append=True, inplace=True)
+                if alg == predict_synthetic_intervention_hsvt_ols:
+                    df, stat_df = alg(training_df, targets, **kwargs)
+                    df = df.loc[targets]
+                    stat_df = stat_df.loc[targets]
+                    df['fold'] = [fold_ix]*df.shape[0]
+                    stat_df['fold'] = [fold_ix]*stat_df.shape[0]
+                    df.set_index('fold', append=True, inplace=True)
+                    stat_df.set_index('fold', append=True, inplace=True)
 
-                assert df.shape == (len(test_ixs), training_df.shape[1])
-                return df
+                    assert df.shape == (len(test_ixs), training_df.shape[1])
+                    return df, stat_df
+                else:
+                    df = alg(training_df, targets, **kwargs)
+                    df = df.loc[targets]
+                    df['fold'] = [fold_ix]*df.shape[0]
+                    df.set_index('fold', append=True, inplace=True)
 
-            things = list(zip(range(self.num_folds), self.fold_train_ixs, self.fold_test_ixs))
+                    assert df.shape == (len(test_ixs), training_df.shape[1])
+                    return df
+
+            tasks = list(zip(range(self.num_folds), self.fold_train_ixs, self.fold_test_ixs))
 
             if multithread:
                 with Pool(cpu_count()-1) as pool:
-                    prediction_dfs = p_map(run, things)
+                    prediction_dfs = p_map(run, tasks)
             else:
-                prediction_dfs = list(tqdm((run(thing) for thing in things), total=len(things)))
+                prediction_dfs = list(tqdm((run(task) for task in tasks), total=len(tasks)))
 
-            prediction_df = pd.concat(prediction_dfs, axis=0)
-            prediction_df.to_pickle(alg_results_filename)
+            if alg == predict_synthetic_intervention_hsvt_ols:
+                prediction_dfs, stat_dfs = zip(*prediction_dfs)
+                prediction_df = pd.concat(prediction_dfs, axis=0)
+                prediction_df.to_pickle(alg_results_filename)
+                statistic_df = pd.concat(stat_dfs, axis=0)
+                statistic_df.to_pickle(alg_stats_filename)
+            else:
+                prediction_df = pd.concat(prediction_dfs, axis=0)
+                prediction_df.to_pickle(alg_results_filename)
 
         return prediction_df
 

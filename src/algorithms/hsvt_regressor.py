@@ -41,11 +41,12 @@ def projection_stat(v1, v2):
 
 
 class HSVTRegressor:
-    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None):
+    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None, verbose=True):
         self.center = center
         self.energy = energy
         self.coef_ = None
         self.bias = None
+        self.verbose = verbose
 
         # parameters needed for hypothesis test
         self.sig_level = sig_level
@@ -88,17 +89,23 @@ class HSVTRegressor:
                 critval = critical_value(self.sigma, r1, r2, self.num_shared_ivs, self.t0, num_dimensions, self.sig_level)
             else:
                 critval = r2 * self.hypo_test_percent
-            print(stat, critval)
-            print(f"stat={stat}, critval={critval}, sigma={self.sigma}, r1={r1}, r2={r2}, n_d={self.num_shared_ivs}, t0={self.t0}, t1={num_dimensions}")
+
+            if self.verbose:
+                print(f"stat={stat}, critval={critval}, sigma={self.sigma}, r1={r1}, r2={r2}, n_d={self.num_shared_ivs}, t0={self.t0}, t1={num_dimensions}")
             if stat > critval:
-                raise RejectionError
+                raise RejectionError(stat)
 
         source_values = (u_mat*spectra) @ v_mat
         res = source_values @ self.coef_
         if self.center:
             res += self.bias
-        return res
+
+        if self.hypo_test:
+            return res, stat
+        else:
+            return res
 
 
 class RejectionError(Exception):
-    pass
+    def __init__(self, stat):
+        self.stat = stat

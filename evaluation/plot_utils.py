@@ -52,6 +52,7 @@ def boxplots(data_dict, boxColors, xlabel, ylabel, title, top=1, bottom=0, scale
             medians[i] = medianY[0]
         # Finally, overplot the sample averages, with horizontal alignment
         # in the center of each box
+        print(np.average(data[i]))
         plt.plot([np.average(med.get_xdata())], [np.average(data[i])],
                  color='w', marker='*', markeredgecolor='k')
 
@@ -72,3 +73,5 @@ def boxplots(data_dict, boxColors, xlabel, ylabel, title, top=1, bottom=0, scale
                 weight='roman', size='medium')
     plt.figtext(0.815, 0.013, ' Mean Value', color='black', weight='roman',
                 size='x-small')
+
+    plt.tight_layout()

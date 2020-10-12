@@ -9,142 +9,156 @@ from src.algorithms import HSVTRegressor, RejectionError
 import ipdb
 
 
-class NoTrainingData(Exception):
+class NoContextsWithTargetAction(Exception):
     pass
 
 
-class NoDonorData(Exception):
+class NoDonorActionsWithTargetContext(Exception):
     pass
 
 
 def find_donors(
         sorted_donors,
-        training2available_donors,
-        target_training_ix,
-        target_donor_ix,
+        contexts2available_actions,
+        target_context,
+        target_action,
         num_desired_donors=None
 ):
-    donors_available_for_target = [
+    donor_actions_with_target_context = [
         donor for donor in sorted_donors
-        if donor in training2available_donors[target_training_ix]
+        if donor in contexts2available_actions[target_context]
     ]
-    if len(donors_available_for_target) == 0:
-        raise NoDonorData
+    print(f"num donor actions: {len(donor_actions_with_target_context)}")
+    if len(donor_actions_with_target_context) == 0:
+        raise NoDonorActionsWithTargetContext
 
     # start with training data which has the target_donor_ix available
-    current_training_ixs = [
-        t for t, available_donor_dims in training2available_donors.items()
-        if target_donor_ix in available_donor_dims
+    current_training_contexts = [
+        context for context, available_actions in contexts2available_actions.items()
+        if target_action in available_actions
     ]
-    if len(current_training_ixs) == 0:
-        raise NoTrainingData
+    print(f"num training contexts: {len(current_training_contexts)}")
+    if len(current_training_contexts) == 0:
+        raise NoContextsWithTargetAction
 
-    donors = set()
+    donor_actions = set()
     while True:
-        if len(donors_available_for_target):
+        if len(donor_actions_with_target_context) == 0:
             break
-        next_donor = donors_available_for_target.pop()
+        next_donor_action = donor_actions_with_target_context.pop(0)
 
         # stop adding donors if it would make the number of training dimensions zero
-        new_training_ixs = [
-            train_ix for train_ix in current_training_ixs
-            if next_donor in training2available_donors[train_ix]
+        new_training_contexts = [
+            train_ix for train_ix in current_training_contexts
+            if next_donor_action in contexts2available_actions[train_ix]
         ]
-        if len(new_training_ixs) == 0:
+        if len(new_training_contexts) == 0:
             break
 
         # stop adding donors if we've reached the desired number of donors, and adding another
         # donor would decrease the number of training dimensions
-        reached_num_desired = len(donors) == num_desired_donors
-        if reached_num_desired and len(new_training_ixs) < len(current_training_ixs):
+        reached_num_desired = len(donor_actions) == num_desired_donors
+        if reached_num_desired and len(new_training_contexts) < len(current_training_contexts):
             break
 
         # otherwise, it's fine to add another donor
-        current_training_ixs = new_training_ixs
-        donors.add(next_donor)
+        current_training_contexts = new_training_contexts
+        donor_actions.add(next_donor_action)
 
-    assert len(current_training_ixs) > 0
-    assert len(donors) > 0
-    return current_training_ixs, donors
+    assert len(current_training_contexts) > 0
+    assert len(donor_actions) > 0
+    return current_training_contexts, donor_actions
 
 
 def synthetic_intervention_inner(
         df,
         targets,
-        regression_function,
+        regressor,
         predictor_no_training,
         default_prediction,
-        donor_dim='intervention',
+        regression_dim='intervention',
         num_desired_donors=None,
         progress=False
 ):
-    assert donor_dim == 'intervention' or donor_dim == 'unit'
-    training_dim = 'unit' if donor_dim == 'intervention' else 'unit'
+    assert regression_dim == 'intervention' or regression_dim == 'unit'
+    context_dim = 'unit' if regression_dim == 'intervention' else 'intervention'
 
-    df = df.sort_index(level=[donor_dim, training_dim])
+    df = df.sort_index(level=[regression_dim, context_dim])
 
-    training2available_donors = get_index_dict(df, training_dim)
-    counter = Counter(df.index.get_level_values(donor_dim))
+    contexts2available_actions = get_index_dict(df, context_dim)
+    counter = Counter(df.index.get_level_values(regression_dim))
     sorted_donors = [donor for donor, _ in counter.most_common()]
 
     num_features = df.shape[1]
     predicted_data = np.zeros((len(targets), num_features))
+    statistic_data = np.zeros(len(targets))
+    statistic_data.fill(np.nan)
     iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
     rejection_counter = 0
     for ix, (target_unit, target_intervention) in iterator:
-        target_donor_ix = target_intervention if donor_dim == 'intervention' else target_unit
-        target_training_ix = target_unit if donor_dim == 'intervention' else target_intervention
+        target_action = target_intervention if regression_dim == 'intervention' else target_unit
+        target_context = target_unit if regression_dim == 'intervention' else target_intervention
 
         # no target data on which to learn the regression model
         try:
             # find donor units
-            training_ixs, donor_ixs = find_donors(
+            training_contexts, donor_actions = find_donors(
                 sorted_donors,
-                training2available_donors,
-                target_training_ix,
-                target_donor_ix,
+                contexts2available_actions,
+                target_context,
+                target_action,
                 num_desired_donors
             )
 
             # get donor source/target
-            donor_source = df[
-                df.index.get_level_values(training_dim).isin(training_ixs) &
-                df.index.get_level_values(donor_dim).isin(donor_ixs)
+            donor_x = df[
+                df.index.get_level_values(context_dim).isin(training_contexts) &
+                df.index.get_level_values(regression_dim).isin(donor_actions)
             ]
             # donor_source = donor_source.sort_index()  # 14%
-            donor_source_values = donor_source.values.reshape(len(donor_ixs), -1).T
-            assert donor_source_values.shape == (num_features*len(training_ixs), len(donor_ixs))
-            donor_target = df[
-                df.index.get_level_values(training_dim).isin(training_ixs) &
-                (df.index.get_level_values(donor_dim) == target_donor_ix)
+            donor_x_values = donor_x.values.reshape(len(donor_actions), -1).T
+            assert donor_x_values.shape == (num_features*len(training_contexts), len(donor_actions))
+            donor_y = df[
+                df.index.get_level_values(context_dim).isin(training_contexts) &
+                (df.index.get_level_values(regression_dim) == target_action)
             ]
             # donor_target = donor_target.sort_index()  # 10%
-            donor_target_values = donor_target.values.flatten()
-            assert donor_target_values.shape == (num_features*len(training_ixs), )
+            donor_y_values = donor_y.values.flatten()
+            assert donor_y_values.shape == (num_features*len(training_contexts), )
 
             # perform regression
-            regression_function.fit(donor_source_values, donor_target_values)
+            regressor.fit(donor_x_values, donor_y_values)
 
             # predict
-            target_source = df[
-                (df.index.get_level_values(training_dim) == target_training_ix) &
-                (df.index.get_level_values(donor_dim).isin(donor_ixs))
+            target_x = df[
+                (df.index.get_level_values(context_dim) == target_context) &
+                (df.index.get_level_values(regression_dim).isin(donor_actions))
             ]
             # target_source = target_source.sort_index()  # 12%
-            target_source_values = target_source.values.T
+            target_x_values = target_x.values.T
 
-            prediction = regression_function.predict(target_source_values)
+            if isinstance(regressor, HSVTRegressor):
+                prediction, stat = regressor.predict(target_x_values)
+            else:
+                prediction = regressor.predict(target_x_values)
+
             predicted_data[ix] = prediction
-        except (NoTrainingData, RejectionError):
-            target_source_values = df[df.index.get_level_values(training_dim) == target_training_ix].values
-            prediction = predictor_no_training(target_source_values)
+        except (NoContextsWithTargetAction, RejectionError) as err:
+            target_context_data = df[df.index.get_level_values(context_dim) == target_context].values
+            prediction = predictor_no_training(target_context_data)
             predicted_data[ix] = prediction
-        except NoDonorData:
+            if isinstance(err, RejectionError):
+                statistic_data[ix] = err.stat
+            else:
+                print("no training perturbations for target cell type")
+            # ipdb.set_trace()
+        except NoDonorActionsWithTargetContext as e:
             predicted_data[ix] = default_prediction
+            print("no donor data")
 
-    print(f"Rejected: {rejection_counter} out of {len(targets)}")
     predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
-    return predicted_df
+    statistic_df = pd.DataFrame(statistic_data, index=targets, columns=['statistic'])
+    return predicted_df, statistic_df
 
 
 def predict_synthetic_intervention_ols(
@@ -154,19 +168,19 @@ def predict_synthetic_intervention_ols(
         progress=False,
         donor_dim='intervention'
 ):
-    regression_function = LinearRegression()
+    regressor = LinearRegression()
 
     predictor_no_training = partial(np.mean, axis=0)
     default_prediction = df.values.mean(axis=0)
 
-    predicted_df = synthetic_intervention_inner(
+    predicted_df, _ = synthetic_intervention_inner(
         df,
         targets,
-        regression_function,
+        regressor,
         predictor_no_training,
         default_prediction,
         num_desired_donors=num_desired_donors,
-        donor_dim=donor_dim,
+        regression_dim=donor_dim,
         progress=progress
     )
     return predicted_df
@@ -184,7 +198,7 @@ def predict_synthetic_intervention_hsvt_ols(
         hypo_test_percent=None,
         donor_dim='intervention'
 ):
-    regression_function = HSVTRegressor(
+    regressor = HSVTRegressor(
         center=center,
         energy=energy,
         sig_level=sig_level,
@@ -195,17 +209,18 @@ def predict_synthetic_intervention_hsvt_ols(
     predictor_no_training = partial(np.mean, axis=0)
     default_prediction = df.values.mean(axis=0)
 
-    predicted_df = synthetic_intervention_inner(
+    predicted_df, statistic_df = synthetic_intervention_inner(
         df,
         targets,
-        regression_function,
+        regressor,
         predictor_no_training,
         default_prediction,
         num_desired_donors=num_desired_donors,
-        donor_dim=donor_dim,
+        regression_dim=donor_dim,
         progress=progress
     )
-    return predicted_df
+
+    return predicted_df, statistic_df
 
 
 

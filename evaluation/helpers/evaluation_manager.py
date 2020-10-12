@@ -18,8 +18,8 @@ alg_names = {
     'alg=impute_intervention_mean': 'Mean in Intervention',
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
-    f'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=intervention': f'SI-intervention',
-    f'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit': f'SI-unit',
+    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention': f'SI-intervention',
+    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=unit': f'SI-unit',
     # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=True,hypo_test_percent=0.1': f'SI+hsvt,{energy},test',
     # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=False': f'SI+hsvt,{energy}',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
@@ -117,6 +117,7 @@ class EvaluationManager:
         os.makedirs('evaluation/plots', exist_ok=True)
         filename = f'evaluation/plots/boxplot_{self.prediction_manager.result_string}.png'
         plt.savefig(filename)
+        plt.title("")
         plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r20{self.prediction_manager.result_string}.png'))
         print(f"Saved to {os.path.abspath(filename)}")
 
@@ -131,12 +132,13 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='$R^2$ score per (cell type, intervention) pair',
             title=self.prediction_manager.result_string,
-            top=1,
-            bottom=.5,
-            scale=.03
+            top=1.1,
+            bottom=0,
+            scale=.08
         )
         os.makedirs('evaluation/plots', exist_ok=True)
         filename = f'evaluation/plots/boxplot_by_iv_{self.prediction_manager.result_string}.png'
         plt.savefig(filename)
+        plt.title("")
         plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r2-per-iv-{self.prediction_manager.result_string}.png'))
         print(f"Saved to {os.path.abspath(filename)}")

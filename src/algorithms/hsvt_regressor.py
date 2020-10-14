@@ -1,6 +1,8 @@
 import numpy as np
 from numpy.linalg import pinv
 from numpy import sqrt, log
+# from fancyimpute import SoftImpute
+from scipy.optimize import linprog
 
 
 def approximate_rank(spectra, energy):
@@ -13,11 +15,53 @@ def approximate_rank(spectra, energy):
     return rank, spectra_total_energy[-1], captured_energy
 
 
-def hsvt(values, energy):
+def hsvt(values, energy, max_rank=None):
     u, spectra, v = np.linalg.svd(values, full_matrices=False)
     rank, total_energy, captured_energy = approximate_rank(spectra, energy)
+    if max_rank is not None:
+        if rank > max_rank:
+            print(rank, max_rank)
+            rank = max_rank
+            captured_energy = spectra[:rank].sum()
     uncaptured_energy = total_energy - captured_energy
     return u[:, :rank], spectra[:rank], v[:rank], uncaptured_energy
+
+
+def find_cutoff(spectra, desired_energy):
+    p = len(spectra)
+    c = -1*np.hstack((np.ones(p), [0]))
+
+    a_ub = np.zeros([2*p + 1, p+1])
+    a_ub[:p, :p] = np.eye(p)
+    a_ub[p:2*p, :p] = np.eye(p)
+    a_ub[p:2*p, -1] = -1
+    a_ub[-1, :-1] = 1
+
+    b_ub = np.zeros(2*p+1)
+    b_ub[:p] = spectra
+    b_ub[-1] = 1-desired_energy
+    print(c)
+    print(a_ub)
+    print(b_ub)
+
+    res = linprog(c, a_ub, b_ub)
+    return res.x
+
+
+def soft_threshold(spectra, t):
+    new_spectra = np.maximum(spectra - t, 0)
+    new_rank = next((ix for ix, val in enumerate(new_spectra) if val == 0), len(new_spectra))
+    return new_spectra, new_rank
+
+
+def ssvt(values, energy):
+    u, spectra, v = np.linalg.svd(values, full_matrices=False)
+    total_energy = spectra.sum()
+    # cutoff = find_cutoff(spectra, desired_energy=energy)
+    cutoff = total_energy*(1 - energy) / len(spectra)
+    new_spectra, new_rank = soft_threshold(spectra, cutoff)
+    print(spectra, new_spectra)
+    return u[:, :new_rank], new_spectra[:new_rank], v[:new_rank]
 
 
 def critical_value(sigma, r1, r2, num_donor_units, num_dimensions1, num_dimensions2, alpha):
@@ -40,13 +84,46 @@ def projection_stat(v1, v2):
     return np.linalg.norm(delta, 'fro') ** 2
 
 
+class MERegressor:
+    def __init__(
+        self,
+        center=True,
+        matrix_estimator=None
+    ):
+        self.center = center
+        self.matrix_estimator = matrix_estimator
+        self.bias = None
+        self.coef_ = None
+
+    def fit(self, donor_x, donor_y):
+        if self.center:
+            donor_x = donor_x - donor_x.mean(axis=0)
+            self.bias = donor_y.mean()
+            donor_y = donor_y - self.bias
+
+        donor_umat, donor_spectra, donor_vmat = self.matrix_estimator(donor_x)
+        inv_donor = (donor_vmat.T/donor_spectra) @ donor_umat.T
+        self.coef_ = inv_donor @ donor_y
+
+    def predict(self, target_x):
+        if self.center:
+            target_x = target_x - target_x.mean(axis=0)
+
+        res = None
+        if self.center:
+            res += self.bias
+        return res
+
+
 class HSVTRegressor:
-    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None, verbose=True):
+    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None, verbose=True, equal_rank=False):
         self.center = center
         self.energy = energy
         self.coef_ = None
         self.bias = None
+        self.r1 = None
         self.verbose = verbose
+        self.equal_rank = equal_rank
 
         # parameters needed for hypothesis test
         self.sig_level = sig_level
@@ -65,6 +142,7 @@ class HSVTRegressor:
             target_values = target_values - self.bias
 
         u_mat, spectra, v_mat, uncaptured_energy = hsvt(source_values, self.energy)
+        self.r1 = len(spectra)
         if self.hypo_test:
             self.vmat_source = v_mat
             self.num_shared_ivs = source_values.shape[1]
@@ -77,23 +155,26 @@ class HSVTRegressor:
     def predict(self, source_values):
         if self.center:
             source_values = source_values - source_values.mean(axis=0)
-        u_mat, spectra, v_mat, _ = hsvt(source_values, self.energy)
+
+        if self.equal_rank:
+            u_mat, spectra, v_mat, _ = hsvt(source_values, self.energy, max_rank=self.r1)
+        else:
+            u_mat, spectra, v_mat, _ = hsvt(source_values, self.energy)
 
         if self.hypo_test:
             stat = projection_stat(self.vmat_source, v_mat)
             num_dimensions = source_values.shape[0]
-            r1 = self.vmat_source.shape[0]
             r2 = v_mat.shape[0]
 
             if self.hypo_test_percent is None:
-                critval = critical_value(self.sigma, r1, r2, self.num_shared_ivs, self.t0, num_dimensions, self.sig_level)
+                critval = critical_value(self.sigma, self.r1, r2, self.num_shared_ivs, self.t0, num_dimensions, self.sig_level)
             else:
                 critval = r2 * self.hypo_test_percent
 
-            if self.verbose:
-                print(f"stat={stat}, critval={critval}, sigma={self.sigma}, r1={r1}, r2={r2}, n_d={self.num_shared_ivs}, t0={self.t0}, t1={num_dimensions}")
             if stat > critval:
-                raise RejectionError(stat)
+                print(f"stat={stat}, critval={critval}, sigma={self.sigma}, r1={self.r1}, r2={r2}, n_d={self.num_shared_ivs}, t0={self.t0}, t1={num_dimensions}")
+            if stat > critval:
+                raise RejectionError(stat, critval)
 
         source_values = (u_mat*spectra) @ v_mat
         res = source_values @ self.coef_
@@ -101,11 +182,19 @@ class HSVTRegressor:
             res += self.bias
 
         if self.hypo_test:
-            return res, stat
+            return res, stat, critval
         else:
             return res
 
 
 class RejectionError(Exception):
-    def __init__(self, stat):
+    def __init__(self, stat, critval):
         self.stat = stat
+        self.critval = critval
+
+
+if __name__ == '__main__':
+    from functools import partial
+    regressor = MERegressor(matrix_estimator=partial(ssvt, energy=.95))
+    regressor.fit(np.random.random((5, 5)), np.random.random(5))
+

@@ -28,7 +28,7 @@ def find_donors(
         donor for donor in sorted_donors
         if donor in contexts2available_actions[target_context]
     ]
-    print(f"num donor actions: {len(donor_actions_with_target_context)}")
+    # print(f"num donor actions: {len(donor_actions_with_target_context)}")
     if len(donor_actions_with_target_context) == 0:
         raise NoDonorActionsWithTargetContext
 
@@ -37,7 +37,7 @@ def find_donors(
         context for context, available_actions in contexts2available_actions.items()
         if target_action in available_actions
     ]
-    print(f"num training contexts: {len(current_training_contexts)}")
+    # print(f"num training contexts: {len(current_training_contexts)}")
     if len(current_training_contexts) == 0:
         raise NoContextsWithTargetAction
 
@@ -91,7 +91,7 @@ def synthetic_intervention_inner(
 
     num_features = df.shape[1]
     predicted_data = np.zeros((len(targets), num_features))
-    statistic_data = np.zeros(len(targets))
+    statistic_data = np.zeros((len(targets), 2))
     statistic_data.fill(np.nan)
     iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
     rejection_counter = 0
@@ -138,7 +138,8 @@ def synthetic_intervention_inner(
             target_x_values = target_x.values.T
 
             if isinstance(regressor, HSVTRegressor):
-                prediction, stat = regressor.predict(target_x_values)
+                prediction, stat, critval = regressor.predict(target_x_values)
+                statistic_data[ix] = [stat, critval]
             else:
                 prediction = regressor.predict(target_x_values)
 
@@ -148,7 +149,8 @@ def synthetic_intervention_inner(
             prediction = predictor_no_training(target_context_data)
             predicted_data[ix] = prediction
             if isinstance(err, RejectionError):
-                statistic_data[ix] = err.stat
+                statistic_data[ix, 0] = err.stat
+                statistic_data[ix, 1] = err.critval
             else:
                 print("no training perturbations for target cell type")
             # ipdb.set_trace()
@@ -157,7 +159,7 @@ def synthetic_intervention_inner(
             print("no donor data")
 
     predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
-    statistic_df = pd.DataFrame(statistic_data, index=targets, columns=['statistic'])
+    statistic_df = pd.DataFrame(statistic_data, index=targets, columns=['statistic', 'critval'])
     return predicted_df, statistic_df
 
 
@@ -196,14 +198,16 @@ def predict_synthetic_intervention_hsvt_ols(
         hypo_test=True,
         sig_level=.05,
         hypo_test_percent=None,
-        donor_dim='intervention'
+        donor_dim='intervention',
+        equal_rank=False
 ):
     regressor = HSVTRegressor(
         center=center,
         energy=energy,
         sig_level=sig_level,
         hypo_test=hypo_test,
-        hypo_test_percent=hypo_test_percent
+        hypo_test_percent=hypo_test_percent,
+        equal_rank=equal_rank
     )
 
     predictor_no_training = partial(np.mean, axis=0)

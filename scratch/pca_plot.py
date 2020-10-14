@@ -6,6 +6,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 from utils import pandas_minmax
 import umap
+from matplotlib.patches import Patch
 
 DO_PCA = True
 if DO_PCA:
@@ -44,6 +45,7 @@ data.set_index('pert_iname', append=True, inplace=True)
 pert_inames = set(data.index.get_level_values('pert_iname'))
 
 target_pert_inames = {'SEC16A', 'ANO10'}
+target_pert_ids = set(data[data.index.get_level_values('pert_iname').isin(target_pert_inames)].index.get_level_values('pert_id'))
 target_pert_info = pert_info[pert_info['pert_iname'].isin(target_pert_inames)]
 print(target_pert_info)
 data = data[data.index.get_level_values('pert_iname').isin(target_pert_inames)]
@@ -55,18 +57,22 @@ embedded_values = reducer.fit_transform(data.values)
 
 print("Plotting, colored by pert_iname")
 plt.clf()
-pert2ix = {pert: ix for ix, pert in enumerate(pert_inames)}
+pert2ix = {pert: ix for ix, pert in enumerate(target_pert_inames)}
 colors = data.index.get_level_values('pert_iname').map(pert2ix)
 plt.scatter(embedded_values[:, 0], embedded_values[:, 1], c=colors, cmap=colormap)
-plt.legend()
+plt.legend(handles=[
+    Patch(color=colormap(ix), label=pert) for pert, ix in pert2ix.items()
+])
 plt.savefig('scratch/distinct_pca_pert_iname_coloring.png')
 
 print("Plotting, colored by pert_id")
 plt.clf()
-pert2ix = {pert: ix for ix, pert in enumerate(pert_ids)}
+pert2ix = {pert: ix for ix, pert in enumerate(target_pert_ids)}
 colors = data.index.get_level_values('pert_id').map(pert2ix)
 plt.scatter(embedded_values[:, 0], embedded_values[:, 1], c=colors, cmap=colormap)
-plt.legend()
+plt.legend(handles=[
+    Patch(color=colormap(ix), label=pert) for pert, ix in pert2ix.items()
+])
 plt.savefig('scratch/distinct_pca_pert_id_coloring.png')
 
 print("Plotting, colored by cell type")
@@ -74,5 +80,7 @@ plt.clf()
 cell2ix = {cell: ix for ix, cell in enumerate(set(data.index.get_level_values('cell_id')))}
 colors = data.index.get_level_values('cell_id').map(cell2ix)
 plt.scatter(embedded_values[:, 0], embedded_values[:, 1], c=colors, cmap=colormap)
-plt.legend()
+plt.legend(handles=[
+    Patch(color=colormap(ix), label=celltype) for celltype, ix in cell2ix.items()
+])
 plt.savefig('scratch/distinct_pca_celltype_coloring.png')

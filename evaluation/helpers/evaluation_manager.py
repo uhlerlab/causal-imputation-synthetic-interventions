@@ -14,14 +14,14 @@ boxColors = ['#addd8e', '#31a354', '#7fcdbb', '#2c7fb8',
 
 energy = 0.95
 alg_names = {
-    'alg=impute_unit_mean': 'Mean in Unit',
-    'alg=impute_intervention_mean': 'Mean in Intervention',
+    'alg=impute_unit_mean': 'Mean over Actions',
+    'alg=impute_intervention_mean': 'Mean over Contexts',
     'alg=impute_two_way_mean': '2-way Mean',
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
-    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention': f'SI in Unit',
-    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=unit': f'SI in Intervention',
-    # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=True,hypo_test_percent=0.1': f'SI+hsvt,{energy},test',
-    # f'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy={energy},hypo_test=False': f'SI+hsvt,{energy}',
+    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=unit': f'SI-Context',
+    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention': f'SI-Action',
+    # f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=False,donor_dim=intervention': f'SI-action-HSVT',
+    # f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention': f'SI-action-HSVT, +test',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
     # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=False,energy=0.8': 'SI+hsvt,.8',
 }
@@ -142,3 +142,57 @@ class EvaluationManager:
         plt.title("")
         plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r2-per-iv-{self.prediction_manager.result_string}.png'))
         print(f"Saved to {os.path.abspath(filename)}")
+
+    def statistic_vs_best(self):
+        s = 'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention,equal_rank=True'
+        stats_filename = self.prediction_manager.statistic_filenames[s]
+        stats = pd.read_pickle(stats_filename)
+        r2s = self.r2()
+        r2s_best = r2s.groupby('fold_ix').max()
+
+        stats = stats.values[:, 0] + np.random.normal(0, .05, size=len(stats))
+
+        plt.clf()
+        plt.scatter(stats, r2s_best.values)
+        plt.xlabel("Statistic")
+        plt.ylabel("Best R^2")
+        plt.ylim([0, 1])
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/statistic-vs-best_{self.prediction_manager.result_string}.png'))
+
+        plt.clf()
+        r2s_mean = r2s[r2s.index.get_level_values('alg') == 'alg=impute_unit_mean']
+        plt.scatter(stats, r2s_mean.values)
+        plt.xlabel("Statistic")
+        plt.ylabel("R^2 of mean-over-actions")
+        plt.ylim([0, 1])
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/statistic-vs-mean-r2_{self.prediction_manager.result_string}.png'))
+
+        plt.clf()
+        r2s_si_hsvt = r2s[r2s.index.get_level_values('alg') == 'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention,equal_rank=True']
+        plt.scatter(stats, r2s_si_hsvt.values)
+        plt.xlabel("Statistic")
+        plt.ylabel("R^2 of SI-action")
+        plt.ylim([0, 1])
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/statistic-vs-si-hsvt-r2_{self.prediction_manager.result_string}.png'))
+
+        plt.clf()
+        r2s_si = r2s[r2s.index.get_level_values('alg') == 'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention']
+        plt.scatter(stats, r2s_si.values)
+        plt.xlabel("Statistic")
+        plt.ylabel("R^2 of SI-action")
+        plt.ylim([0, 1])
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/statistic-vs-si-r2_{self.prediction_manager.result_string}.png'))
+
+        nan_ixs = np.isnan(stats)
+        stats = stats[~nan_ixs]
+        r2s_best = r2s_best.values[~nan_ixs].flatten()
+        r2s_mean = r2s_mean.values[~nan_ixs].flatten()
+        r2s_si_hsvt = r2s_si_hsvt.values[~nan_ixs].flatten()
+        r2s_si = r2s_si.values[~nan_ixs].flatten()
+
+        print(np.polyfit(stats[r2s_best > 0], r2s_best[r2s_best > 0], 1))
+        print(np.polyfit(stats[r2s_mean > 0], r2s_mean[r2s_mean > 0], 1))
+        print(np.polyfit(stats[r2s_si > 0], r2s_si[r2s_si > 0], 1))
+        print(np.polyfit(stats[r2s_si_hsvt > 0], r2s_si_hsvt[r2s_si_hsvt > 0], 1))
+
+        ipdb.set_trace()

@@ -66,6 +66,7 @@ class PredictionManager:
         print(f"[PredictionManager.__init__] done creating test/training indices")
 
         self.prediction_filenames = dict()
+        self.statistic_filenames = dict()
 
     def predict(
             self,
@@ -96,6 +97,7 @@ class PredictionManager:
         alg_results_filename = os.path.join(self.result_folder, full_alg_name + '.pkl')
         alg_stats_filename = os.path.join(self.result_folder, full_alg_name + '_stats.pkl')
         self.prediction_filenames[full_alg_name] = alg_results_filename
+        self.statistic_filenames[full_alg_name] = alg_stats_filename
 
         # if results already exist, just load them
         if not overwrite and os.path.exists(alg_results_filename):
@@ -147,6 +149,7 @@ class PredictionManager:
                 prediction_df.to_pickle(alg_results_filename)
 
         return prediction_df
+
 
 
 

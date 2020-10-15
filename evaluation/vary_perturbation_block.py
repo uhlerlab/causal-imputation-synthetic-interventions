@@ -53,19 +53,30 @@ def run(name, average, num_perts):
             donor_dim='intervention',
             progress=False,
             overwrite=False,
-            multithread=False
+            multithread=False,
+            equal_rank=True
         )
-        pm.predict(
-            predict_synthetic_intervention_hsvt_ols,
-            num_desired_donors=None,
-            energy=energy,
-            hypo_test=True,
-            hypo_test_percent=.1,
-            donor_dim='unit',
-            progress=False,
-            overwrite=False,
-            multithread=False
-        )
+        # pm.predict(
+        #     predict_synthetic_intervention_hsvt_ols,
+        #     num_desired_donors=None,
+        #     energy=energy,
+        #     hypo_test=False,
+        #     donor_dim='intervention',
+        #     progress=False,
+        #     overwrite=False,
+        #     multithread=False
+        # )
+        # pm.predict(
+        #     predict_synthetic_intervention_hsvt_ols,
+        #     num_desired_donors=None,
+        #     energy=energy,
+        #     hypo_test=True,
+        #     hypo_test_percent=.1,
+        #     donor_dim='unit',
+        #     progress=False,
+        #     overwrite=False,
+        #     multithread=False
+        # )
 
         em = EvaluationManager(pm)
         r = em.r2()
@@ -74,6 +85,7 @@ def run(name, average, num_perts):
         # em.r2_in_iv()
         em.boxplot()
         em.boxplot_per_intervention()
+        em.statistic_vs_best()
 
         return r
 

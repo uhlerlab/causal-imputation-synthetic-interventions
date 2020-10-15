@@ -116,7 +116,7 @@ class MERegressor:
 
 
 class HSVTRegressor:
-    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None, verbose=True, equal_rank=False):
+    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None, verbose=True, equal_rank=False, hypo_test_override=False):
         self.center = center
         self.energy = energy
         self.coef_ = None
@@ -124,6 +124,7 @@ class HSVTRegressor:
         self.r1 = None
         self.verbose = verbose
         self.equal_rank = equal_rank
+        self.hypo_test_override = hypo_test_override
 
         # parameters needed for hypothesis test
         self.sig_level = sig_level
@@ -173,7 +174,7 @@ class HSVTRegressor:
 
             if stat > critval:
                 print(f"stat={stat}, critval={critval}, sigma={self.sigma}, r1={self.r1}, r2={r2}, n_d={self.num_shared_ivs}, t0={self.t0}, t1={num_dimensions}")
-            if stat > critval:
+            if stat > critval and self.hypo_test_override:
                 raise RejectionError(stat, critval)
 
         source_values = (u_mat*spectra) @ v_mat

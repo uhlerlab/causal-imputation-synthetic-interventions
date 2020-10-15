@@ -137,7 +137,7 @@ def synthetic_intervention_inner(
             # target_source = target_source.sort_index()  # 12%
             target_x_values = target_x.values.T
 
-            if isinstance(regressor, HSVTRegressor):
+            if isinstance(regressor, HSVTRegressor) and regressor.hypo_test:
                 prediction, stat, critval = regressor.predict(target_x_values)
                 statistic_data[ix] = [stat, critval]
             else:
@@ -199,7 +199,8 @@ def predict_synthetic_intervention_hsvt_ols(
         sig_level=.05,
         hypo_test_percent=None,
         donor_dim='intervention',
-        equal_rank=False
+        equal_rank=False,
+        hypo_test_override=False
 ):
     regressor = HSVTRegressor(
         center=center,
@@ -207,7 +208,8 @@ def predict_synthetic_intervention_hsvt_ols(
         sig_level=sig_level,
         hypo_test=hypo_test,
         hypo_test_percent=hypo_test_percent,
-        equal_rank=equal_rank
+        equal_rank=equal_rank,
+        hypo_test_override=hypo_test_override
     )
 
     predictor_no_training = partial(np.mean, axis=0)

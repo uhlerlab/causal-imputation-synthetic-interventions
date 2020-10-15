@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import os
 # import seaborn as sns
 import pandas as pd
+import numpy as np
 # sns.set()
 plt.style.use('ggplot')
 
@@ -29,10 +30,13 @@ print(statistics_iv.isna().sum())
 statistics_unit = statistics_unit[~statistics_unit.isna()]
 statistics_iv = statistics_iv[~statistics_iv.isna()]
 
+bins = np.linspace(0, 3, 11)
+hist_unit, _ = np.histogram(statistics_unit, bins=bins)
+hist_iv, _ = np.histogram(statistics_iv, bins=bins)
 plt.clf()
-plt.hist(statistics_unit, label='Unit', alpha=.5)
-plt.hist(statistics_iv, label='Intervention', alpha=.5)
+plt.bar(bins[:-1], hist_unit/hist_unit.sum(), label='Context', alpha=.5, width=3/10)
+plt.bar(bins[:-1], hist_iv/hist_iv.sum(), label='Intervention', alpha=.5, width=3/10)
 plt.xlabel('Statistic')
-plt.ylabel('Count')
+plt.ylabel('Frequency')
 plt.legend()
-plt.savefig('evaluation/statistics_histograms/test.png')
+plt.savefig('evaluation/statistics_histograms/statistic_histogram.png')

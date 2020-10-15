@@ -46,13 +46,21 @@ embedded_data = reducer.fit_transform(data)
 num_control = control_data.shape[0]
 print("Plotting, colored by cell type")
 plt.clf()
+fig, [ax1, ax2] = plt.subplots(1, 2, sharey=True)
+fig.set_size_inches(12, 6)
+ax1.set_aspect('equal', adjustable='box')
+ax2.set_aspect('equal', adjustable='box')
 cell2ix = {cell: ix for ix, cell in enumerate(set(data.index.get_level_values('cell_id')))}
 control_colors = control_data.index.get_level_values('cell_id').map(cell2ix)
 control_colors = [colormap[c] for c in control_colors]
 pert_colors = pert_data.index.get_level_values('cell_id').map(cell2ix)
 pert_colors = [colormap[c] for c in pert_colors]
-plt.scatter(embedded_data[:num_control, 0], embedded_data[:num_control, 1], c=control_colors, alpha=.1, s=100, linewidths=1)
-plt.scatter(embedded_data[num_control:, 0], embedded_data[num_control:, 1], c=pert_colors, marker='P', s=20)
+# ax1.scatter(embedded_data[:num_control, 0], embedded_data[:num_control, 1], c=control_colors, alpha=.1, s=100, linewidths=1)
+# ax2.scatter(embedded_data[num_control:, 0], embedded_data[num_control:, 1], c=pert_colors, marker='P', s=20)
+ax1.scatter(embedded_data[:num_control, 0], embedded_data[:num_control, 1], c=control_colors)
+ax2.scatter(embedded_data[num_control:, 0], embedded_data[num_control:, 1], c=pert_colors)
+ax1.set_title('Control')
+ax2.set_title('Perturbation')
 lgd = plt.legend(
     handles=[
         Patch(color=colormap[ix], label=celltype) for celltype, ix in cell2ix.items()
@@ -61,7 +69,15 @@ lgd = plt.legend(
     bbox_to_anchor=(1.05, 1),
     fontsize='small'
 )
+# plt.title('Control')
+# plt.savefig('scratch/umap_celltype_coloring_dmso.png', bbox_inches='tight')
 plt.savefig('scratch/umap_celltype_coloring.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
+
+# plt.clf()
+# plt.scatter(embedded_data[num_control:, 0], embedded_data[num_control:, 1], c=pert_colors)
+# plt.gca().set_yticklabels([])
+# plt.title('Perturbation')
+# plt.savefig('scratch/umap_celltype_coloring_pert.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
 
 # print("Plotting, colored by pert type")
 # plt.clf()

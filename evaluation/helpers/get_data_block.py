@@ -59,6 +59,7 @@ def get_data_block(
         expressions.index.get_level_values('cell_id').isin(cells) &
         expressions.index.get_level_values('pert_id').isin(perts)
     ]
+    ipdb.set_trace()
     print("[get_data_block] Done filtering")
     block.index.rename(['unit', 'intervention'], inplace=True)
     missing = pd.MultiIndex.from_tuples(set(itr.product(cells, perts)) - set(block.index), names=['unit', 'intervention'])

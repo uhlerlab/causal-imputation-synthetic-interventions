@@ -63,7 +63,7 @@ plt.scatter(embedded_values[:, 0], embedded_values[:, 1], c=colors, cmap=colorma
 plt.legend(handles=[
     Patch(color=colormap(ix), label=pert) for pert, ix in pert2ix.items()
 ])
-plt.savefig('scratch/distinct_pca_pert_iname_coloring.png')
+plt.savefig('scratch/figures/distinct_pca_pert_iname_coloring.png')
 
 print("Plotting, colored by pert_id")
 plt.clf()
@@ -73,7 +73,7 @@ plt.scatter(embedded_values[:, 0], embedded_values[:, 1], c=colors, cmap=colorma
 plt.legend(handles=[
     Patch(color=colormap(ix), label=pert) for pert, ix in pert2ix.items()
 ])
-plt.savefig('scratch/distinct_pca_pert_id_coloring.png')
+plt.savefig('scratch/figures/distinct_pca_pert_id_coloring.png')
 
 print("Plotting, colored by cell type")
 plt.clf()
@@ -83,4 +83,4 @@ plt.scatter(embedded_values[:, 0], embedded_values[:, 1], c=colors, cmap=colorma
 plt.legend(handles=[
     Patch(color=colormap(ix), label=celltype) for celltype, ix in cell2ix.items()
 ])
-plt.savefig('scratch/distinct_pca_celltype_coloring.png')
+plt.savefig('scratch/figures/distinct_pca_celltype_coloring.png')

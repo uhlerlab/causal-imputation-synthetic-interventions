@@ -28,19 +28,3 @@ wget ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE92nnn/GSE92742/suppl/GSE92742_Broa
 gunzip GSE92742_Broad_LINCS_Level3_INF_mlr12k_n1319138x12328.gctx.gz
 
 cd ..
-
-# if saving to a different directory, soft link to /data
-#cd data
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_Level2_GEX_delta_n49216x978.gctx GSE92742_Broad_LINCS_Level2_GEX_delta_n49216x978.gctx
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_Level2_GEX_epsilon_n1269922x978.gctx GSE92742_Broad_LINCS_Level2_GEX_epsilon_n1269922x978.gctx
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_Level3_INF_mlr12k_n1319138x12328.gctx GSE92742_Broad_LINCS_Level3_INF_mlr12k_n1319138x12328.gctx
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_cell_info.txt GSE92742_Broad_LINCS_cell_info.txt
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_gene_info.txt GSE92742_Broad_LINCS_gene_info.txt
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_inst_info.txt GSE92742_Broad_LINCS_inst_info.txt
-#ln -s /mnt/covid19/l1000/GSE92742_Broad_LINCS_pert_info.txt GSE92742_Broad_LINCS_pert_info.txt
-
-# must filter institution info to match gene expression data
-python filter_inst_info.py
-
-wget ftp://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi_lite.owl.gz
-gunzip chebi_lite.owl.gz

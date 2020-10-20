@@ -71,7 +71,7 @@ lgd = plt.legend(
 )
 # plt.title('Control')
 # plt.savefig('scratch/umap_celltype_coloring_dmso.png', bbox_inches='tight')
-plt.savefig('scratch/umap_celltype_coloring.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
+plt.savefig('visuals/figures/umap_celltype_coloring.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
 
 # plt.clf()
 # plt.scatter(embedded_data[num_control:, 0], embedded_data[num_control:, 1], c=pert_colors)

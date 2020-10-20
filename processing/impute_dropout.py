@@ -16,6 +16,7 @@ from time import time
 import pandas as pd
 tqdm.pandas()
 
+print('=========================================================')
 original_data = load_cmap_original()
 print("[processing/impute_dropout] Replacing 1 with NaN")
 start = time()

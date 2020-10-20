@@ -32,7 +32,7 @@ def main(data, name):
     os.makedirs('data/processed/most_common_dosages', exist_ok=True)
     start = time()
     retained_data = data.loc[retained_inst_ids]
-    print(f"Filtering took {time() - start} seconds. Retaining {retained_data.shape[0]} samples.")
+    print(f"[processing/filter_most_common_dosage] Filtering took {time() - start} seconds. Retaining {retained_data.shape[0]} samples.")
     retained_data.to_pickle(f'data/processed/most_common_dosages/{name}.pkl')
 
 
@@ -41,9 +41,10 @@ if __name__ == '__main__':
         'level2_filtered': load_cmap_filtered,
         'level2_imputed': load_cmap_imputed,
         'level2': load_cmap_original,
-        'level3': load_cmap_level3
+        # 'level3': load_cmap_level3
     }
 
+    print('=========================================================')
     for name, data_loader in files.items():
         data = data_loader()
         main(data, name)

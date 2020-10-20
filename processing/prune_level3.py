@@ -9,12 +9,12 @@ start = time()
 rows = parse(LINCS3_FILE_GCTX, row_meta_only=True)
 row_ixs = rows.index.isin(l1000_genes).nonzero()[0]
 data = parse(LINCS3_FILE_GCTX, ridx=row_ixs).data_df
-print(f"Loading took {time() - start} seconds")
+print(f"[processing/prune_level3] Loading took {time() - start} seconds")
 
 data_ = _format_cmap(data)
 
-print("Saving")
+print("[processing/prune_level3] Saving")
 start = time()
 data_.to_pickle(LINCS3_PRUNED_FILE)
-print(f"Saving took {time() - start} seconds")
+print(f"[processing/prune_level3] Saving took {time() - start} seconds")
 

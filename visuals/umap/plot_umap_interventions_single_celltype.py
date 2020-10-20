@@ -61,5 +61,5 @@ lgd = plt.legend(
     bbox_to_anchor=(1.05, 1),
     fontsize='small'
 )
-plt.savefig('scratch/umap_pert_coloring_vcap.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
+plt.savefig('visuals/figures/umap_pert_coloring_vcap.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
 

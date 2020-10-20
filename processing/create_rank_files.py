@@ -1,6 +1,5 @@
 from filenames import load_inst_info_epsilon, PERT_ID_FIELD, CELL_RANK_FILE, PERT_RANK_FILE
 from filenames import load_inst_info_most_common, CELL_RANK_COMMON_FILE, PERT_RANK_COMMON_FILE
-import os
 
 print('=========================================================')
 print(f'[processing/create_rank_files] sorting most common celltypes/perturbations')
@@ -19,7 +18,6 @@ cell_ranks_most_common = inst_info_most_common.groupby('cell_id')[PERT_ID_FIELD]
 pert_ranks_most_common = inst_info_most_common.groupby(PERT_ID_FIELD)['cell_id'].nunique().sort_values(ascending=False)
 
 print(f'[processing/create_rank_files] saving sorted lists into files')
-os.makedirs('processing/helper_data', exist_ok=True)
 cell_ranks.to_csv(CELL_RANK_FILE)
 pert_ranks.to_csv(PERT_RANK_FILE)
 cell_ranks_most_common.to_csv(CELL_RANK_COMMON_FILE)

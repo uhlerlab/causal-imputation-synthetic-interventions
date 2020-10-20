@@ -1,13 +1,17 @@
 from visuals.plot_availability_matrix import plot_availability_matrix
 import matplotlib.pyplot as plt
 import numpy as np
-from filenames import load_cmap_original
+from filenames import load_cmap_original, load_pert_ranks
 
 df = load_cmap_original()
+pert_ranks = load_pert_ranks()
+perts = set(pert_ranks.index)
+df = df[df.index.get_level_values('pert_id').isin(perts)]
+df.index.set_names(['inst_id', 'unit', 'intervention'], inplace=True)
 
 plt.clf()
 plt.grid(False)
-plot_availability_matrix(df)
+plot_availability_matrix(df, ytick_space=5000)
 plt.savefig('visuals/figures/availability.png')
 
 counts = df.groupby(['intervention', 'unit']).size()

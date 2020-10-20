@@ -20,10 +20,8 @@ alg_names = {
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
     f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=unit': f'SI-Context',
     f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention': f'SI-Action',
-    # f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=False,donor_dim=intervention': f'SI-action-HSVT',
-    # f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention': f'SI-action-HSVT, +test',
-    # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,energy=0.8': 'SI+hsvt,.8',
-    # 'alg=predict_synthetic_control_unit_hsvt_ols,num_desired_interventions=None,progress=False,energy=0.8': 'SI+hsvt,.8',
+    f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=False,donor_dim=intervention': f'SI-action-HSVT',
+    f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention,equal_rank=True': f'SI-action-HSVT, +test',
 }
 
 
@@ -101,7 +99,8 @@ class EvaluationManager:
 
     def boxplot(self):
         r2_df = self.r2()
-        algs = list(alg_names.keys())
+        algs = list(set(r2_df.index.get_level_values('alg')))
+        # algs = list(alg_names.keys())
         r2_dict = {alg_names[alg]: r2_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
         boxplots(
@@ -118,12 +117,12 @@ class EvaluationManager:
         filename = f'evaluation/plots/boxplot_{self.prediction_manager.result_string}.png'
         plt.savefig(filename)
         plt.title("")
-        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r20{self.prediction_manager.result_string}.png'))
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r2-{self.prediction_manager.result_string}.png'))
         print(f"Saved to {os.path.abspath(filename)}")
 
     def boxplot_per_intervention(self):
         r2_df = self.r2_per_iv()
-        algs = list(alg_names.keys())
+        algs = list(set(r2_df.index.get_level_values('alg')))
         r2_dict = {alg_names[alg]: r2_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
         boxplots(

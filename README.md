@@ -5,7 +5,7 @@ You can setup a virtual environment with all necessary packages by running
 bash setup.sh
 ```
 
-The data files are too large to be kept in the repository, but can be downloaded by running `download.sh`.
+The data files are too large (5Gb) to be kept in the repository, but can be downloaded by running `download.sh`.
 
 The files are organized as follows:
 * `src` contains the baseline algorithms and the synthetic interventions algorithm
@@ -17,12 +17,12 @@ Once you have downloaded the data, you can run the processing scripts in the cor
 ```
 bash process.sh
 ```
+This will create ~44Gb of processed data, and may take about 1 hour.
 
 Figures can be reproduced via the following files:
 * **Figure 2**: visuals/umap/umap_all.py
-* **Figure 3a**: evaluation/vary_perturbation_block.py
+* **Figure 3a, 9**: evaluation/vary_perturbation_block.py
 * **Figure 3b**: evaluation/plot_statistics.py
-* **Figure 6a, 7a, 7b**: visuals/plot_availability_matrix.py
-* **Figure 6b, 7c, 7d**:
+* **Figure 6a, 7a, 7b**: visuals/plot_availability_original.py
+* **Figure 6b, 7c, 7d**: visuals/plot_availability_subset.py
 * **Figure 8**: visuals/umap/plot_umap_interventions_single_celltype.py
-* **Figure 9**: evaluation/vary_perturbation_block.py

@@ -19,6 +19,9 @@ CELL_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_cell_info.t
 PERT_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_pert_info.txt')
 GENE_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_gene_info.txt')
 INST_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info.txt')
+SIG_INFO_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_sig_info.txt')
+SIG_METRICS_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_sig_metrics.txt')
+PERT_METRICS_FILE = os.path.join(RAW_DATA_FOLDER, 'GSE92742_Broad_LINCS_pert_metrics.txt')
 INST_INFO_EPSILON_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info_epsilon.pkl')
 INST_INFO_MOST_COMMON_FILE = os.path.join(PROCESSED_DATA_FOLDER, 'GSE92742_Broad_LINCS_inst_info_common.pkl')
 
@@ -50,6 +53,18 @@ def load_inst_info_most_common():
 
 def load_gene_info():
     return pd.read_csv(GENE_INFO_FILE, sep='\t', index_col=0)
+
+
+def load_sig_info():
+    return pd.read_csv(SIG_INFO_FILE, sep='\t', index_col=0)
+
+
+def load_sig_metrics():
+    return pd.read_csv(SIG_METRICS_FILE, sep='\t', index_col=0)
+
+
+def load_pert_metrics():
+    return pd.read_csv(PERT_METRICS_FILE, sep='\t', index_col=0)
 
 
 def _format_cmap(data_):

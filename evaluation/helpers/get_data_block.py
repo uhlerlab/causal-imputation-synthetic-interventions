@@ -12,7 +12,6 @@ def remove_celltypes_no_control(
 ):
     retained_units = set(data.query("intervention == @control_pert").index.get_level_values('unit'))
     retained_data = data.query("unit in @retained_units")
-    ipdb.set_trace()
     return retained_data
 
 
@@ -59,7 +58,6 @@ def get_data_block(
         expressions.index.get_level_values('cell_id').isin(cells) &
         expressions.index.get_level_values('pert_id').isin(perts)
     ]
-    ipdb.set_trace()
     print("[get_data_block] Done filtering")
     block.index.rename(['unit', 'intervention'], inplace=True)
     missing = pd.MultiIndex.from_tuples(set(itr.product(cells, perts)) - set(block.index), names=['unit', 'intervention'])
@@ -68,7 +66,7 @@ def get_data_block(
 
 if __name__ == '__main__':
     data_block, cells, perts, targets = get_data_block(10, 20, 1000, 1020)
-    from src.algorithms2 import impute_unit_mean, impute_intervention_mean, impute_two_way_mean
+    from src.algorithms import impute_unit_mean, impute_intervention_mean, impute_two_way_mean
 
     m = impute_unit_mean(data_block, targets)
     m2 = impute_intervention_mean(data_block, targets)

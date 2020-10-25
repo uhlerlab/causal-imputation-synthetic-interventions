@@ -17,32 +17,32 @@ algs = []
 
 
 def run(name, average, num_perts):
-    for pert_start in [0]:
-        pm = PredictionManager(
-            num_cells=None,
-            num_perts=num_perts,
-            name=name,
-            num_folds=None,
-            average=average
-        )
-        pm.predict(impute_unit_mean, overwrite=False)
-        pm.predict(impute_intervention_mean, overwrite=False)
-        pm.predict(impute_two_way_mean)
-        pm.predict(predict_intervention_fixed_effect, control_intervention='DMSO', overwrite=False)
-        pm.predict(
-            predict_synthetic_intervention_ols,
-            num_desired_donors=None,
-            donor_dim='intervention',
-            progress=False,
-            overwrite=False,
-        )
-        pm.predict(
-            predict_synthetic_intervention_ols,
-            num_desired_donors=None,
-            donor_dim='unit',
-            progress=False,
-            overwrite=False,
-        )
+    pm = PredictionManager(
+        num_cells=None,
+        num_perts=num_perts,
+        name=name,
+        num_folds=None,
+        average=average
+    )
+    pm.predict(impute_unit_mean, overwrite=False)
+    pm.predict(impute_intervention_mean, overwrite=False)
+    pm.predict(impute_two_way_mean)
+    pm.predict(predict_intervention_fixed_effect, control_intervention='DMSO', overwrite=False)
+    pm.predict(
+        predict_synthetic_intervention_ols,
+        num_desired_donors=None,
+        donor_dim='intervention',
+        progress=False,
+        overwrite=False,
+    )
+    pm.predict(
+        predict_synthetic_intervention_ols,
+        num_desired_donors=None,
+        donor_dim='unit',
+        progress=False,
+        overwrite=False,
+    )
+    if not average:
         energy = .95
         pm.predict(
             predict_synthetic_intervention_hsvt_ols,
@@ -56,38 +56,27 @@ def run(name, average, num_perts):
             multithread=False,
             equal_rank=True
         )
-        # pm.predict(
-        #     predict_synthetic_intervention_hsvt_ols,
-        #     num_desired_donors=None,
-        #     energy=energy,
-        #     hypo_test=False,
-        #     donor_dim='intervention',
-        #     progress=False,
-        #     overwrite=False,
-        #     multithread=False
-        # )
-        # pm.predict(
-        #     predict_synthetic_intervention_hsvt_ols,
-        #     num_desired_donors=None,
-        #     energy=energy,
-        #     hypo_test=True,
-        #     hypo_test_percent=.1,
-        #     donor_dim='unit',
-        #     progress=False,
-        #     overwrite=False,
-        #     multithread=False
-        # )
+        pm.predict(
+            predict_synthetic_intervention_hsvt_ols,
+            num_desired_donors=None,
+            energy=energy,
+            hypo_test=False,
+            donor_dim='intervention',
+            progress=False,
+            overwrite=False,
+            multithread=False
+        )
 
-        em = EvaluationManager(pm)
-        r = em.r2()
-        print(set(r.index.get_level_values('alg')))
-        # r = em.r2_in_iv()
-        # em.r2_in_iv()
-        em.boxplot()
-        em.boxplot_per_intervention()
-        em.statistic_vs_best()
+    em = EvaluationManager(pm)
+    r = em.r2()
+    print(set(r.index.get_level_values('alg')))
+    # r = em.r2_in_iv()
+    # em.r2_in_iv()
+    em.boxplot()
+    em.boxplot_per_intervention()
+    # em.statistic_vs_best()
 
-        return r
+    return r
 
 
 if __name__ == '__main__':
@@ -99,6 +88,7 @@ if __name__ == '__main__':
     import itertools as itr
 
     r2 = run('level2', average=True, num_perts=100)
+    r2_ = run('level2', average=False, num_perts=100)
 
     # for average, num_perts in itr.product([True, False], [100]):
     #     run('level2', average=average, num_perts=num_perts)

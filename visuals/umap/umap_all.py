@@ -26,25 +26,25 @@ control_data = data[data.index.get_level_values("pert_id") == "DMSO"]
 control_data = shuffle(control_data)
 control_data = control_data.groupby("cell_id").head(100)
 pert_data = data[data.index.get_level_values("pert_id") != "DMSO"]
-print("Shuffling")
-pert_data = shuffle(pert_data)
-print("Picking heads")
+print("[visuals/umap/umap_all] Shuffling")
+pert_data = shuffle(pert_data, random_state=289371)
+print("[visuals/umap/umap_all] Picking heads")
 pert_data = pert_data.groupby("cell_id").head(100)
 data = pd.concat([control_data, pert_data])
 
 LOG2 = True
 MINMAX = True
 if LOG2:
-    print("log2")
+    print("[visuals/umap/umap_all] log2")
     data = np.log2(data+1)
 if MINMAX:
-    print("minmax")
+    print("[visuals/umap/umap_all] minmax")
     data = pandas_minmax(data, axis=1)
-print("Embedding")
+print("[visuals/umap/umap_all] Embedding")
 embedded_data = reducer.fit_transform(data)
 
 num_control = control_data.shape[0]
-print("Plotting, colored by cell type")
+print("[visuals/umap/umap_all] Plotting, colored by cell type")
 plt.clf()
 fig, [ax1, ax2] = plt.subplots(1, 2, sharey=True)
 fig.set_size_inches(12, 6)
@@ -71,7 +71,7 @@ lgd = plt.legend(
 )
 # plt.title('Control')
 # plt.savefig('scratch/umap_celltype_coloring_dmso.png', bbox_inches='tight')
-plt.savefig('scratch/umap_celltype_coloring.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
+plt.savefig('visuals/figures/umap_celltype_coloring.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
 
 # plt.clf()
 # plt.scatter(embedded_data[num_control:, 0], embedded_data[num_control:, 1], c=pert_colors)

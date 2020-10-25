@@ -12,6 +12,8 @@ from matplotlib.lines import Line2D
 sns.set()
 # sns.set_style('white')
 
+random.seed(123124849)
+
 DO_PCA = False
 if DO_PCA:
     reducer = PCA(n_components=2)
@@ -32,12 +34,12 @@ data = data.groupby("pert_id").head(100)
 LOG2 = True
 MINMAX = True
 if LOG2:
-    print("log2")
+    print("[visuals/umap/plot_umap_interventions_single_celltype] log2")
     data = np.log2(data+1)
 if MINMAX:
-    print("minmax")
+    print("[visuals/umap/plot_umap_interventions_single_celltype] minmax")
     data = pandas_minmax(data, axis=1)
-print("Embedding")
+print("[visuals/umap/plot_umap_interventions_single_celltype] Embedding")
 embedded_data = reducer.fit_transform(data)
 
 control_ixs = data.index.get_level_values('pert_id') == 'DMSO'
@@ -46,7 +48,7 @@ pert_data = data[~control_ixs]
 control_embedded_data = embedded_data[control_ixs]
 pert_embedded_data = embedded_data[~control_ixs]
 
-print("Plotting, colored by cell type")
+print("[visuals/umap/plot_umap_interventions_single_celltype] Plotting, colored by cell type")
 plt.clf()
 pert2ix = {pert: ix for ix, pert in enumerate(perts[:-1])}
 colors = pert_data.index.get_level_values('pert_id').map(pert2ix)
@@ -61,5 +63,5 @@ lgd = plt.legend(
     bbox_to_anchor=(1.05, 1),
     fontsize='small'
 )
-plt.savefig('scratch/umap_pert_coloring_vcap.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
+plt.savefig('visuals/figures/umap_pert_coloring_vcap.png', bbox_extra_artists=(lgd, ), bbox_inches='tight')
 

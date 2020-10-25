@@ -32,4 +32,4 @@ for log2 in [True, False]:
     plt.plot(energy)
     plt.ylabel('Spectral Energy')
     plt.xlabel('Number of singular vectors')
-    plt.savefig(os.path.join('exploration', 'figures', f'spectral_energy_control_log2={log2}.png'))
+    plt.savefig(os.path.join('scratch', 'figures', f'spectral_energy_control_log2={log2}.png'))

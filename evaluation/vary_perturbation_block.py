@@ -73,6 +73,7 @@ def run(name, average, num_perts):
     # r = em.r2_in_iv()
     # em.r2_in_iv()
     em.boxplot()
+    em.boxplot_rmse()
     em.boxplot_per_intervention()
     # em.statistic_vs_best()
 

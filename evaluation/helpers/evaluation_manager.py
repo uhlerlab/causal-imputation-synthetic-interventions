@@ -33,6 +33,10 @@ def compute_r2_matrix(true_values, predicted_values):
     return 1 - true_error/baseline_error
 
 
+def compute_rmse_matrix(true_values, predicted_values):
+    return np.sqrt(np.mean((true_values - predicted_values)**2))
+
+
 def compute_r2_vector(true_values, predicted_values):
     true_mean = true_values.mean()
     baseline_error = np.sum((true_values - true_mean)**2)
@@ -71,6 +75,39 @@ class EvaluationManager:
                 ix += predicted_df_fold.shape[0]
 
         res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
+        return res
+
+    def rmse(self):
+        num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
+        num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
+        rmses = np.zeros(num_rows)
+        index = []
+
+        ix = 0
+        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
+            print(f'[EvaluationManager.rmse] computing rmse for {alg}')
+            predicted_df = pd.read_pickle(prediction_filename)
+            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
+                # get test data that was held out in this fold
+                test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
+                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
+                predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
+                assert (test_df.index == predicted_df_fold.index).all()
+
+                if alg == 'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit':
+                    ipdb.set_trace()
+
+                # compute the R2 score for each gene expression profile
+                rmses[ix:(ix + predicted_df_fold.shape[0])] = compute_rmse_matrix(test_df.values, predicted_df_fold.values)
+                units, ivs = predicted_df_fold.index.get_level_values('unit'), predicted_df_fold.index.get_level_values(
+                    'intervention')
+                index.extend(list(zip(units, ivs, [fold_ix] * len(units), [alg] * len(units))))
+                ix += predicted_df_fold.shape[0]
+
+        res = pd.DataFrame(
+            rmses,
+            index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg'])
+        )
         return res
 
     def r2_per_iv(self):
@@ -118,6 +155,28 @@ class EvaluationManager:
         plt.savefig(filename)
         plt.title("")
         plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r2-{self.prediction_manager.result_string}.png'))
+        print(f"Saved to {os.path.abspath(filename)}")
+
+    def boxplot_rmse(self):
+        rmse_df = self.rmse()
+        algs = list(set(rmse_df.index.get_level_values('alg')))
+        # algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: rmse_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='RMSE per (cell type, intervention) pair',
+            bottom=0,
+            top=500,
+            title=self.prediction_manager.result_string,
+        )
+        os.makedirs('evaluation/plots', exist_ok=True)
+        filename = f'evaluation/plots/rmse_boxplot_{self.prediction_manager.result_string}.png'
+        plt.savefig(filename)
+        plt.title("")
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/rmse_causal-imputation-r2-{self.prediction_manager.result_string}.png'))
         print(f"Saved to {os.path.abspath(filename)}")
 
     def boxplot_per_intervention(self):

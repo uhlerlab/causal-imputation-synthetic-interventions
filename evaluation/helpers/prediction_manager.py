@@ -8,6 +8,7 @@ import ipdb
 from multiprocessing import Pool, cpu_count
 from p_tqdm import p_map
 from src.algorithms import predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
+from time import time
 
 
 BLACKLIST_KWARGS = {'verbose', 'multithread', 'overwrite', 'progress'}
@@ -67,6 +68,7 @@ class PredictionManager:
 
         self.prediction_filenames = dict()
         self.statistic_filenames = dict()
+        self.time_filenames = dict()
 
     def predict(
             self,
@@ -74,7 +76,7 @@ class PredictionManager:
             overwrite=False,
             multithread=False,
             **kwargs
-    ) -> List[pd.DataFrame]:
+    ) -> (List[pd.DataFrame], List[np.array]):
         """
         Use an algorithm to predict held-out values from each fold.
 
@@ -95,21 +97,26 @@ class PredictionManager:
 
         # filenames for the results of each fold
         alg_results_filename = os.path.join(self.result_folder, full_alg_name + '.pkl')
+        alg_times_filename = os.path.join(self.result_folder, full_alg_name + '_times.pkl')
         alg_stats_filename = os.path.join(self.result_folder, full_alg_name + '_stats.pkl')
         self.prediction_filenames[full_alg_name] = alg_results_filename
         self.statistic_filenames[full_alg_name] = alg_stats_filename
+        self.time_filenames[full_alg_name] = alg_times_filename
 
         # if results already exist, just load them
         if not overwrite and os.path.exists(alg_results_filename):
             print(f"[PredictionManager.predict] loading predictions for {full_alg_name}")
             prediction_df = pd.read_pickle(alg_results_filename)
+            times_taken = np.loadtxt(alg_times_filename)
         else:
-            print(f"Predicting for {full_alg_name}")
+            print(f"[PredictionManager.predict] Predicting for {full_alg_name}")
 
             def run(p):
                 fold_ix, train_ixs, test_ixs = p
                 training_df = self.gene_expression_df.iloc[train_ixs]
                 targets = self.gene_expression_df.iloc[test_ixs].index
+
+                start_time = time()
                 if alg == predict_synthetic_intervention_hsvt_ols:
                     df, stat_df = alg(training_df, targets, **kwargs)
                     df = df.loc[targets]
@@ -120,7 +127,7 @@ class PredictionManager:
                     stat_df.set_index('fold', append=True, inplace=True)
 
                     assert df.shape == (len(test_ixs), training_df.shape[1])
-                    return df, stat_df
+                    return df, stat_df, time() - start_time
                 else:
                     df = alg(training_df, targets, **kwargs)
                     df = df.loc[targets]
@@ -128,7 +135,7 @@ class PredictionManager:
                     df.set_index('fold', append=True, inplace=True)
 
                     assert df.shape == (len(test_ixs), training_df.shape[1])
-                    return df
+                    return df, time() - start_time
 
             tasks = list(zip(range(self.num_folds), self.fold_train_ixs, self.fold_test_ixs))
 
@@ -136,19 +143,26 @@ class PredictionManager:
                 with Pool(cpu_count()-1) as pool:
                     prediction_dfs = p_map(run, tasks)
             else:
-                prediction_dfs = list(tqdm((run(task) for task in tasks), total=len(tasks)))
+                results = list(tqdm((run(task) for task in tasks), total=len(tasks)))
 
             if alg == predict_synthetic_intervention_hsvt_ols:
-                prediction_dfs, stat_dfs = zip(*prediction_dfs)
+                prediction_dfs, stat_dfs, times_taken = zip(*results)
                 prediction_df = pd.concat(prediction_dfs, axis=0)
                 prediction_df.to_pickle(alg_results_filename)
                 statistic_df = pd.concat(stat_dfs, axis=0)
                 statistic_df.to_pickle(alg_stats_filename)
+                print(f"[PredictionManager.predict] Saving predictions to {alg_results_filename}")
+                print(f"[PredictionManager.predict] Saving stats to {alg_stats_filename}")
             else:
+                prediction_dfs, times_taken = zip(*results)
                 prediction_df = pd.concat(prediction_dfs, axis=0)
                 prediction_df.to_pickle(alg_results_filename)
+                print(f"[PredictionManager.predict] Saving predictions to {alg_results_filename}")
+            times_taken = np.array(times_taken)
+            np.savetxt(alg_times_filename, times_taken)
+            print(f"[PredictionManager.predict] Saving times to {alg_results_filename}")
 
-        return prediction_df
+        return prediction_df, times_taken
 
 
 

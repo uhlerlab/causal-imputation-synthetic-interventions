@@ -77,6 +77,29 @@ class EvaluationManager:
         res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
         return res
 
+    def plot_times(self):
+        alg2times = dict()
+        algs = list(self.prediction_manager.time_filenames.keys())
+
+        for alg in algs:
+            times = np.loadtxt(self.prediction_manager.time_filenames[alg])
+            alg2times[alg_names[alg]] = np.log(times)
+        boxplots(
+            alg2times,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='Log (# of seconds) per prediction.',
+            title=self.prediction_manager.result_string,
+            top=-3,
+            bottom=-6,
+        )
+        os.makedirs('evaluation/plots', exist_ok=True)
+        filename = f'evaluation/plots/time_boxplot_{self.prediction_manager.result_string}.png'
+        plt.savefig(filename)
+        plt.title("")
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-time-{self.prediction_manager.result_string}.png'))
+        print(f"Saved to {os.path.abspath(filename)}")
+
     def rmse(self):
         num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
         num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
@@ -84,9 +107,11 @@ class EvaluationManager:
         index = []
 
         ix = 0
-        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+
+        for alg in algs:
             print(f'[EvaluationManager.rmse] computing rmse for {alg}')
-            predicted_df = pd.read_pickle(prediction_filename)
+            predicted_df = pd.read_pickle(self.prediction_manager.prediction_filenames[alg])
             for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
                 # get test data that was held out in this fold
                 test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
@@ -159,7 +184,8 @@ class EvaluationManager:
 
     def boxplot_rmse(self):
         rmse_df = self.rmse()
-        algs = list(set(rmse_df.index.get_level_values('alg')))
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        print(algs)
         # algs = list(alg_names.keys())
         r2_dict = {alg_names[alg]: rmse_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
@@ -169,7 +195,7 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='RMSE per (cell type, intervention) pair',
             bottom=0,
-            top=500,
+            top=800,
             title=self.prediction_manager.result_string,
         )
         os.makedirs('evaluation/plots', exist_ok=True)

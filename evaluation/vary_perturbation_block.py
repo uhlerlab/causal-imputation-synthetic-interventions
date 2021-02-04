@@ -26,7 +26,7 @@ def run(name, average, num_perts):
     )
     pm.predict(impute_unit_mean, overwrite=False)
     pm.predict(impute_intervention_mean, overwrite=False)
-    pm.predict(impute_two_way_mean)
+    pm.predict(impute_two_way_mean, overwrite=False)
     pm.predict(predict_intervention_fixed_effect, control_intervention='DMSO', overwrite=False)
     pm.predict(
         predict_synthetic_intervention_ols,
@@ -75,6 +75,7 @@ def run(name, average, num_perts):
     em.boxplot()
     em.boxplot_rmse()
     em.boxplot_per_intervention()
+    em.plot_times()
     # em.statistic_vs_best()
 
     return r

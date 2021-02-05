@@ -91,7 +91,7 @@ def synthetic_intervention_inner(
 
     num_features = df.shape[1]
     predicted_data = np.zeros((len(targets), num_features))
-    statistic_data = np.zeros((len(targets), 2))
+    statistic_data = np.zeros((len(targets), 4))
     statistic_data.fill(np.nan)
     iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
     rejection_counter = 0
@@ -109,6 +109,7 @@ def synthetic_intervention_inner(
                 target_action,
                 num_desired_donors
             )
+            statistic_data[ix, [2, 3]] = [(len(donor_actions), len(training_contexts))]
 
             # get donor source/target
             donor_x = df[
@@ -147,19 +148,22 @@ def synthetic_intervention_inner(
         except (NoContextsWithTargetAction, RejectionError) as err:
             target_context_data = df[df.index.get_level_values(context_dim) == target_context].values
             prediction = predictor_no_training(target_context_data)
+            print(target_context_data.shape[0], target_context)
+            statistic_data[ix, [2, 3]] = [target_context_data.shape[0], 0]
             predicted_data[ix] = prediction
             if isinstance(err, RejectionError):
                 statistic_data[ix, 0] = err.stat
                 statistic_data[ix, 1] = err.critval
             else:
-                print("no training perturbations for target cell type")
+                print(f"no training perturbations for target context {target_context}")
             # ipdb.set_trace()
         except NoDonorActionsWithTargetContext as e:
             predicted_data[ix] = default_prediction
-            print("no donor data")
+            statistic_data[ix, [2, 3]] = [0, 0]
+            print(f"no donor data for target context {target_context}")
 
     predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
-    statistic_df = pd.DataFrame(statistic_data, index=targets, columns=['statistic', 'critval'])
+    statistic_df = pd.DataFrame(statistic_data, index=targets, columns=['statistic', 'critval', 'num_donors', 'num_training'])
     return predicted_df, statistic_df
 
 
@@ -175,7 +179,7 @@ def predict_synthetic_intervention_ols(
     predictor_no_training = partial(np.mean, axis=0)
     default_prediction = df.values.mean(axis=0)
 
-    predicted_df, _ = synthetic_intervention_inner(
+    predicted_df, statistics_df = synthetic_intervention_inner(
         df,
         targets,
         regressor,
@@ -185,7 +189,7 @@ def predict_synthetic_intervention_ols(
         regression_dim=donor_dim,
         progress=progress
     )
-    return predicted_df
+    return predicted_df, statistics_df
 
 
 def predict_synthetic_intervention_hsvt_ols(

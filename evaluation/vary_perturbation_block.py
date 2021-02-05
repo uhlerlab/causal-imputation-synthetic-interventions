@@ -90,7 +90,7 @@ if __name__ == '__main__':
     import itertools as itr
 
     r2 = run('level2', average=True, num_perts=100)
-    r2_ = run('level2', average=False, num_perts=100)
+    # r2_ = run('level2', average=False, num_perts=100)
 
     # for average, num_perts in itr.product([True, False], [100]):
     #     run('level2', average=average, num_perts=num_perts)

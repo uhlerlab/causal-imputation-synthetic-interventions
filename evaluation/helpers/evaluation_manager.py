@@ -161,15 +161,15 @@ class EvaluationManager:
 
     def boxplot(self):
         r2_df = self.r2()
-        algs = list(set(r2_df.index.get_level_values('alg')))
-        # algs = list(alg_names.keys())
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        print(algs)
         r2_dict = {alg_names[alg]: r2_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
         boxplots(
             r2_dict,
             boxColors,
             xlabel='Algorithm',
-            ylabel='$R^2$ score per (cell type, intervention) pair',
+            ylabel='$R^2$ score per context/action pair',
             title=self.prediction_manager.result_string,
             top=1,
             bottom=.5,
@@ -193,7 +193,7 @@ class EvaluationManager:
             r2_dict,
             boxColors,
             xlabel='Algorithm',
-            ylabel='RMSE per (cell type, intervention) pair',
+            ylabel='RMSE per context/action pair',
             bottom=0,
             top=800,
             title=self.prediction_manager.result_string,
@@ -214,7 +214,7 @@ class EvaluationManager:
             r2_dict,
             boxColors,
             xlabel='Algorithm',
-            ylabel='$R^2$ score per (cell type, intervention) pair',
+            ylabel='$R^2$ score per context/action pair',
             title=self.prediction_manager.result_string,
             top=1.1,
             bottom=0,

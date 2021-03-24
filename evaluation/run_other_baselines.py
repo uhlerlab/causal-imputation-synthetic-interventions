@@ -1,5 +1,5 @@
 from evaluation.helpers import PredictionManager
-from src.algorithms import impute_missforest, impute_mice, impute_miceforest, predict_synthetic_intervention_ols
+from src.algorithms import impute_missforest, impute_mice, impute_miceforest, predict_synthetic_intervention_ols, impute_als
 from evaluation.helpers.evaluation_manager import compute_r2_matrix
 import numpy as np
 import pandas as pd
@@ -10,6 +10,9 @@ alg_names = {
     'alg=impute_mice': "MICE (sklearn IterativeImputer)",
     'alg=impute_missforest': "MissForest",
     'alg=impute_miceforest': "MiceForest",
+    'alg=impute_als': "Tensor Decomposition",
+    'alg=impute_als,rank=5': "Tensor Decomposition, Rank 5",
+    'alg=impute_als,rank=100': "Tensor Decomposition, Rank 100",
     'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention': 'SI'
 }
 
@@ -29,9 +32,10 @@ pm = PredictionManager(
     average=average,
     num_genes=num_genes
 )
-mice_predictions, mice_times = pm.predict(impute_mice, overwrite=True)
-mf_predictions, mf_times = pm.predict(impute_missforest, overwrite=True)
-micef_predictions, micef_times = pm.predict(impute_miceforest, overwrite=True)
+# tensorly_predictions, tensorly_times = pm.predict(impute_als, overwrite=False, rank=100)
+mice_predictions, mice_times = pm.predict(impute_mice, overwrite=False)
+mf_predictions, mf_times = pm.predict(impute_missforest, overwrite=False)
+micef_predictions, micef_times = pm.predict(impute_miceforest, overwrite=False)
 si_predictions, si_times = pm.predict(
     predict_synthetic_intervention_ols,
     num_desired_donors=None,
@@ -76,5 +80,6 @@ boxplots(
     bottom=.5,
     scale=.03
 )
+plt.savefig(f"visuals/figures/imputation_num_genes={num_genes}.png")
 plt.show()
 

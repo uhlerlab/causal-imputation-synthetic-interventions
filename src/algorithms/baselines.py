@@ -9,6 +9,9 @@ import sklearn.neighbors._base
 import sys
 sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
 from missingpy import MissForest
+from tensorly.decomposition import parafac
+from scipy.sparse import csr_matrix
+from itertools import chain
 
 
 def fill_missing_means(df, missing_ixs):
@@ -23,6 +26,34 @@ def fill_missing_means(df, missing_ixs):
         columns=df.columns
     )
     return new_df
+
+
+def df_to_tensor(df, targets):
+    full_index = df.index.tolist() + targets.tolist()
+    units, interventions = zip(*full_index)
+    units, interventions = list(set(units)), list(set(interventions))
+    unit2ix, iv2ix = {unit: ix for ix, unit in enumerate(units)}, {iv: ix for ix, iv in enumerate(interventions)}
+    tensor = np.zeros((len(units), len(interventions), df.shape[1]))
+    for ix, (unit, iv) in enumerate(df.index):
+        tensor[(unit2ix[unit], iv2ix[iv])] = df.values[ix]
+    return tensor, unit2ix, iv2ix
+
+
+def tensor_to_df(tensor, targets, unit2ix, iv2ix):
+    vals = np.zeros((len(targets), tensor.shape[2]))
+    tensor2 = tensor.to_tensor()
+    # TODO: Converting the whole matrix and only computing the desired fiber gives the same answer
+    # TODO: no difference in speed for `p` small, but should check for larger `p`.
+    for ix, (unit, iv) in enumerate(targets):
+        unit_ix, iv_ix = unit2ix[unit], iv2ix[iv]
+        val1 = tensor2[unit_ix, iv_ix]
+        # A = tensor.factors[0][unit_ix]
+        # B = tensor.factors[1][iv_ix]
+        # C = tensor.factors[2]
+        # val2 = (C * A * B).sum(axis=1)
+        # print(np.isclose(val1, val2))
+        vals[ix] = val1
+    return pd.DataFrame(data=vals, index=targets)
 
 
 def df_to_missing(df, targets):
@@ -61,6 +92,13 @@ def impute_miceforest(df, targets: pd.MultiIndex):  # works with categorical
     kds.mice(3)
     completed_data = kds.complete_data()
     return completed_data.iloc[:, :df.shape[1]]
+
+
+def impute_als(df, targets: pd.MultiIndex, rank=20):
+    tensor, unit2ix, iv2ix = df_to_tensor(df, targets)
+    res = parafac(tensor, rank=rank)
+    imputed_df = tensor_to_df(res, targets, unit2ix, iv2ix)
+    return imputed_df
 
 
 def impute_unit_mean(df, targets: pd.MultiIndex):

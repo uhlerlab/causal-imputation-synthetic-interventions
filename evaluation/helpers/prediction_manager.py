@@ -25,11 +25,15 @@ class PredictionManager:
             average: bool = True,
             name='level2_filtered',
             num_folds: Optional[int] = 5,
+            num_genes: Optional[int] = None,
             seed: int = 8838
     ):
         self.result_string = f'cell={cell_start},{num_cells}cells,pert={pert_start},{num_perts}perts,name={name},num_folds={num_folds},average={average}'
+        if num_genes is not None:
+            self.result_string += f',num_genes={num_genes}'
         self.result_folder = os.path.join('evaluation', 'results', self.result_string)
         os.makedirs(self.result_folder, exist_ok=True)
+        self.num_genes = num_genes
 
         if name == 'old_data':
             old_df0 = pd.read_csv('old_data/df0.csv', sep='\t', index_col=0)
@@ -52,7 +56,10 @@ class PredictionManager:
         control_ixs = self.gene_expression_df.index.get_level_values('intervention') == "DMSO"
         num_control_profiles = control_ixs.sum()
         sort_ixs = np.argsort(1 - control_ixs)
-        self.gene_expression_df = self.gene_expression_df.iloc[sort_ixs]
+        if num_genes is None:
+            self.gene_expression_df = self.gene_expression_df.iloc[sort_ixs]
+        else:
+            self.gene_expression_df = self.gene_expression_df.iloc[sort_ixs, :num_genes]
 
         np.random.seed(seed)
         num_profiles = self.gene_expression_df.shape[0]

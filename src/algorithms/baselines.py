@@ -1,6 +1,14 @@
 import pandas as pd
 import numpy as np
 from collections import Counter
+import ipdb
+import miceforest as mf
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+import sklearn.neighbors._base
+import sys
+sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
+from missingpy import MissForest
 
 
 def fill_missing_means(df, missing_ixs):
@@ -15,6 +23,44 @@ def fill_missing_means(df, missing_ixs):
         columns=df.columns
     )
     return new_df
+
+
+def df_to_missing(df, targets):
+    df = pd.concat((df, pd.DataFrame(index=targets)))
+    df['unit'] = pd.Categorical(df.index.get_level_values("unit"))
+    df['intervention'] = pd.Categorical(df.index.get_level_values("intervention"))
+    return df
+
+
+def df_to_missing2(df, targets):
+    df = pd.concat((df, pd.DataFrame(index=targets)))
+    unit_dummies = pd.get_dummies(df.index.get_level_values("unit"))
+    unit_dummies.index = df.index
+    iv_dummies = pd.get_dummies(df.index.get_level_values("intervention"))
+    iv_dummies.index = df.index
+    return pd.concat((df, unit_dummies, iv_dummies), axis=1)
+
+
+def impute_mice(df, targets: pd.MultiIndex):
+    new_df = df_to_missing2(df, targets)
+    imp = IterativeImputer()
+    completed_data = imp.fit_transform(new_df)
+    return pd.DataFrame(completed_data[:, :df.shape[1]], index=new_df.index)
+
+
+def impute_missforest(df, targets: pd.MultiIndex):
+    new_df = df_to_missing2(df, targets)
+    imp = MissForest()
+    completed_data = imp.fit_transform(new_df, cat_vars=list(range(df.shape[1], new_df.shape[1])))
+    return pd.DataFrame(completed_data[:, :df.shape[1]], index=new_df.index)
+
+
+def impute_miceforest(df, targets: pd.MultiIndex):  # works with categorical
+    new_df = df_to_missing(df, targets)
+    kds = mf.KernelDataSet(new_df)
+    kds.mice(3)
+    completed_data = kds.complete_data()
+    return completed_data.iloc[:, :df.shape[1]]
 
 
 def impute_unit_mean(df, targets: pd.MultiIndex):

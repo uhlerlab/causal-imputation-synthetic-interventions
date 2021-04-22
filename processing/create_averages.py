@@ -19,8 +19,10 @@ def main(data, name, log2=False, minmax=False):
 
     print("[processing/create_averages] Mean")
     means = data.groupby(level=['cell_id', PERT_ID_FIELD]).mean()
+    counts = data.groupby(level=['cell_id', PERT_ID_FIELD]).size()
     print("[processing/create_averages] Saving")
     means.to_pickle(f"data/processed/averages/{name}{optional_str('_log2', log2)}{optional_str('_minmax', minmax)}.pkl")
+    counts.to_pickle(f"data/processed/counts/{name}{optional_str('_log2', log2)}{optional_str('_minmax', minmax)}.pkl")
     print(f"[processing/create_averages] Computing/saving averages took {time() - start} seconds")
 
 

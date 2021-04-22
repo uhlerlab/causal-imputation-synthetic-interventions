@@ -3,7 +3,7 @@ from cmapPy.pandasGEXpress.parse import parse
 from filenames import LINCS2_EPSILON_FILE_GCTX, LINCS2_EPSILON_FILE, _format_cmap
 from filenames import LINCS3_FILE_GCTX, LINCS3_FILE
 
-LEVEL2 = False
+LEVEL2 = True
 if LEVEL2:
     print('=========================================================')
     print("[processing/convert_to_pickle] Loading Level 2 (original)")
@@ -15,7 +15,7 @@ if LEVEL2:
     data.to_pickle(LINCS2_EPSILON_FILE)
     print(f"[processing/convert_to_pickle] Saving took {time() - start} seconds")
 
-LEVEL3 = True
+LEVEL3 = False
 if LEVEL3:
     print('=========================================================')
     print("[processing/convert_to_pickle] Loading Level 2 (original)")

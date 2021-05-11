@@ -13,7 +13,7 @@ df, _, _, _ = get_data_block(
 plt.clf()
 plt.grid(False)
 plot_availability_matrix(df)
-plt.savefig('visuals/figures/availability_subset.png')
+plt.savefig('visuals/figures/availability_subset.png', dpi=500, transparent=True)
 
 counts = df.groupby(['intervention', 'unit']).size()
 sorted_perturbations = counts.groupby('intervention').size().sort_values(ascending=True)

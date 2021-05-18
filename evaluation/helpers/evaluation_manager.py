@@ -33,6 +33,12 @@ def compute_r2_matrix(true_values, predicted_values):
     return 1 - true_error/baseline_error
 
 
+def compute_relative_mse_matrix(true_values, predicted_values, baseline):
+    baseline_error = np.sum((true_values - baseline)**2, axis=1)
+    true_error = np.sum((true_values - predicted_values)**2, axis=1)
+    return true_error/baseline_error
+
+
 def compute_rmse_matrix(true_values, predicted_values):
     return np.sqrt(np.mean((true_values - predicted_values)**2))
 
@@ -77,18 +83,49 @@ class EvaluationManager:
         res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
         return res
 
+    def relative_mse(self):
+        num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
+        num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
+        r2s = np.zeros(num_rows)
+        index = []
+
+        ix = 0
+        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
+            print(f'[EvaluationManager.r2] computing r2 for {alg}')
+            predicted_df = pd.read_pickle(prediction_filename)
+            baseline_df = pd.read_pickle(self.prediction_manager.prediction_filenames["alg=impute_unit_mean"])
+            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
+                # get test data that was held out in this fold
+                test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
+                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
+                predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
+                assert (test_df.index == predicted_df_fold.index).all()
+
+                if alg == 'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit':
+                    ipdb.set_trace()
+
+                # compute the R2 score for each gene expression profile
+                baseline = baseline_df[baseline_df.index.get_level_values('fold') == fold_ix]
+                r2s[ix:(ix+predicted_df_fold.shape[0])] = compute_relative_mse_matrix(test_df.values, predicted_df_fold.values, baseline.values)
+                units, ivs = predicted_df_fold.index.get_level_values('unit'), predicted_df_fold.index.get_level_values('intervention')
+                index.extend(list(zip(units, ivs, [fold_ix]*len(units), [alg]*len(units))))
+                ix += predicted_df_fold.shape[0]
+
+        res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
+        return res
+
     def plot_times(self):
         alg2times = dict()
         algs = list(self.prediction_manager.time_filenames.keys())
 
         for alg in algs:
             times = np.loadtxt(self.prediction_manager.time_filenames[alg])
-            alg2times[alg_names[alg]] = np.log(times)
+            alg2times[alg_names[alg]] = np.log10(times)
         boxplots(
             alg2times,
             boxColors,
             xlabel='Algorithm',
-            ylabel='Log (# of seconds) per prediction.',
+            ylabel='Log base 10 of (# of seconds) per prediction.',
             title=self.prediction_manager.result_string,
             top=-3,
             bottom=-6,
@@ -181,6 +218,44 @@ class EvaluationManager:
         plt.title("")
         plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-r2-{self.prediction_manager.result_string}.png'))
         print(f"Saved to {os.path.abspath(filename)}")
+
+    def boxplot_relative_mse(self):
+        df = self.relative_mse()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        print(algs)
+        r2_dict = {alg_names[alg]: df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='Relative MSE',
+            title=self.prediction_manager.result_string,
+            top=1,
+            bottom=.5,
+            scale=.03
+        )
+        os.makedirs('evaluation/plots', exist_ok=True)
+        plt.ylim([0, 5])
+        filename = f'evaluation/plots/boxplot_{self.prediction_manager.result_string}_relative_mse.png'
+        plt.savefig(filename)
+        plt.title("")
+        plt.savefig(os.path.expanduser(f'~/Desktop/cmap-imputation/causal-imputation-relative_mse-{self.prediction_manager.result_string}.pdf'))
+        print(f"Saved to {os.path.abspath(filename)}")
+
+    def plot_quantile_relative_mse(self):
+        df = self.relative_mse()
+        alg = "alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention"
+        # alg = "alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention,equal_rank=True"
+        vals = df[df.index.get_level_values("alg") == alg].values
+        grid = np.linspace(.01, 1, 100)
+        quantiles = np.quantile(vals, grid)
+        plt.clf()
+        plt.plot(grid, quantiles)
+        plt.axhline(1, color='k')
+        plt.ylabel("Relative MSE of SI-Action at quantile")
+        plt.savefig(os.path.expanduser(
+            f'~/Desktop/cmap-imputation/causal-imputation-relative_mse-quantile-{self.prediction_manager.result_string}.pdf'))
 
     def boxplot_rmse(self):
         rmse_df = self.rmse()

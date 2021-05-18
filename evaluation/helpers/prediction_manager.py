@@ -8,6 +8,7 @@ import ipdb
 from multiprocessing import Pool, cpu_count
 from p_tqdm import p_map
 from src.algorithms import predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
+from src.algorithms.synthetic_interventions2 import predict_synthetic_intervention_ols
 from time import time
 
 

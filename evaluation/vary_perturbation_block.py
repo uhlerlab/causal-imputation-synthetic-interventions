@@ -18,16 +18,17 @@ algs = []
 # em.boxplot_per_intervention()
 
 
-def run(name, average, num_perts):
+def run(name, average, num_perts, num_cells=None):
     pm = PredictionManager(
-        num_cells=None,
+        cell_start=0,
+        num_cells=num_cells,
         num_perts=num_perts,
         name=name,
         num_folds=None,
         average=average
     )
     # pm.predict(impute_missforest, overwrite=False)
-    # pm.predict(impute_mice, overwrite=False)
+    pm.predict(impute_mice, overwrite=False)
     pm.predict(impute_unit_mean, overwrite=False)
     pm.predict(impute_intervention_mean, overwrite=False)
     pm.predict(impute_two_way_mean, overwrite=False)

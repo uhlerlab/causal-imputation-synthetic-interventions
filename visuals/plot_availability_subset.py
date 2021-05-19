@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 df, _, _, _ = get_data_block(
-    num_cells=None,
-    num_perts=100,
+    num_cells=5,
+    num_perts=1000,
+    cell_start=0,
     name='level2'
 )
 

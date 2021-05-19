@@ -6,6 +6,13 @@ from scipy.optimize import linprog
 import ipdb
 
 
+def spectra2energy_percent(spectra):
+    spectra_sq = spectra ** 2
+    spectra_total_energy = spectra_sq.cumsum()
+    percent_energy = spectra_total_energy / spectra_total_energy[-1]
+    return percent_energy
+
+
 def approximate_rank(spectra, energy):
     spectra_sq = spectra ** 2
     spectra_total_energy = spectra_sq.cumsum()
@@ -18,6 +25,10 @@ def approximate_rank(spectra, energy):
 
 def hsvt(values, energy, max_rank=None):
     u, spectra, v = np.linalg.svd(values, full_matrices=False)
+    return hsvt_from_svd(u, spectra, v, energy, max_rank=max_rank)
+
+
+def hsvt_from_svd(u, spectra, v, energy, max_rank=None):
     if energy == 1:
         return u, spectra, v, 0
 
@@ -130,6 +141,10 @@ class HSVTRegressor2:
 
         self.intercept_ = None
         self.coef_ = None
+        self.train_error = None
+
+        self.umat_train = None
+        self.spectra_train = None
         self.vmat_train = None
 
     def fit(self, train_x, train_y):
@@ -140,8 +155,11 @@ class HSVTRegressor2:
         if self.energy == 1:
             self.coef_ = np.linalg.lstsq(train_x, train_y, rcond=None)[0]
             self.intercept_ = y_mean - np.sum(self.coef_ * x_mean)
+            self.train_error = np.sqrt(np.sum((train_y - train_x @ self.coef_ - self.intercept_)**2)) / train_x.shape[0]
         else:
             umat, spectra, vmat, _ = hsvt(train_x, energy=self.energy)
+            self.umat_train = umat
+            self.spectra_train = spectra
             self.vmat_train = vmat
 
             inv_source = (vmat.T / spectra) @ umat.T
@@ -151,13 +169,24 @@ class HSVTRegressor2:
     def predict(self, test_x):
         return test_x @ self.coef_ + self.intercept_
 
-    def compute_statistics(self, train_x, test_x):
-        umat_test, spectra_test, vmat_test, _ = hsvt(test_x, self.energy)
-        if self.energy == 1:
-            umat_train, spectra_train, vmat_train, _ = hsvt(train_x, energy=self.energy)
-            self.vmat_train = vmat_train
-        proj_stat = projection_stat(self.vmat_train, vmat_test)
-        print(proj_stat)
+    def get_train_svd(self, train_x):
+        if self.umat_train is None:
+            u, s, v = np.linalg.svd(train_x, full_matrices=False)
+            self.umat_train, self.spectra_train, self.vmat_train = u, s, v
+        return self.umat_train, self.spectra_train, self.vmat_train
+
+    def projection_stat(self, train_x, test_x, energy=.99):
+        umat_train_trunc, spectra_train_trunc, vmat_train_trunc, _ = hsvt_from_svd(*self.get_train_svd(train_x), energy)
+        umat_test, spectra_test, vmat_test = np.linalg.svd(test_x, full_matrices=False)
+        umat_test_trunc, spectra_test_trunc, vmat_test_trunc, _ = hsvt_from_svd(umat_test, spectra_test, vmat_test, energy)
+        proj_stat = projection_stat(vmat_train_trunc, vmat_test) / vmat_test.shape[0]
+        proj_stat_trunc = projection_stat(vmat_train_trunc, vmat_test_trunc) / vmat_test_trunc.shape[0]
+        # print(spectra2energy_percent(self.spectra_train))
+        print(proj_stat, proj_stat_trunc)
+        rank_train = len(spectra_train_trunc)
+        rank_test = len(spectra_test_trunc)
+        return proj_stat_trunc, rank_train, rank_test
+        # ipdb.set_trace()
 
 
 class HSVTRegressor:

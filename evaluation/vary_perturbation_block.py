@@ -1,6 +1,6 @@
 from evaluation.helpers import PredictionManager, EvaluationManager
 from src.algorithms import impute_unit_mean, impute_intervention_mean, impute_two_way_mean
-from src.algorithms import predict_intervention_fixed_effect, predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
+from src.algorithms import predict_intervention_fixed_effect, predict_synthetic_intervention_hsvt_ols
 from src.algorithms.synthetic_interventions2 import predict_synthetic_intervention_ols
 from src.algorithms import HSVTRegressor, synthetic_intervention_inner, hsvt, approximate_rank, fill_missing_means
 from line_profiler import LineProfiler
@@ -28,7 +28,7 @@ def run(name, average, num_perts, num_cells=None):
         average=average
     )
     # pm.predict(impute_missforest, overwrite=False)
-    pm.predict(impute_mice, overwrite=False)
+    # pm.predict(impute_mice, overwrite=False)
     pm.predict(impute_unit_mean, overwrite=False)
     pm.predict(impute_intervention_mean, overwrite=False)
     pm.predict(impute_two_way_mean, overwrite=False)

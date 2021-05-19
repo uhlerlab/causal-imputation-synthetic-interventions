@@ -118,7 +118,7 @@ class SyntheticInterventions:
 
         num_features = self.training_df.shape[1]
         predicted_data = np.zeros((len(targets), num_features))
-        statistic_data = np.zeros((len(targets), 4))
+        statistic_data = np.zeros((len(targets), 7))
         statistic_data.fill(np.nan)
         for ix, (target_context, target_action) in iterator:
             try:
@@ -139,15 +139,18 @@ class SyntheticInterventions:
 
                 # === ADD RELEVANT STATISTICS
                 statistic_data[ix, [2, 3]] = [(len(donor_actions), len(training_contexts))]
+                statistic_data[ix, 4] = self.regressor.train_error
                 if statistics:
-                    self.regressor.compute_statistics(train_x, test_x)
+                    pstat, rank_train, rank_test = self.regressor.projection_stat(train_x, test_x)
+                    statistic_data[ix, 0] = pstat
+                    statistic_data[ix, [5, 6]] = [rank_train, rank_test]
             except NoActionsWithTargetContext:
                 predicted_data[ix] = self.default_prediction
             except NoContextsWithTargetAction:
                 predicted_data[ix] = self._get_block(target_context).mean(axis=1)
 
         predicted_df = pd.DataFrame(predicted_data, index=targets, columns=self.training_df.columns)
-        statistic_df = pd.DataFrame(statistic_data, index=targets, columns=["stat", "cv", "num_donors", "num_contexts"])
+        statistic_df = pd.DataFrame(statistic_data, index=targets, columns=["stat", "cv", "num_donors", "num_contexts", "train_error", "rank_train", "rank_test"])
         return predicted_df, statistic_df
 
 
@@ -162,7 +165,7 @@ def predict_synthetic_intervention_ols(
     context_dim = list({"intervention", "unit"} - {donor_dim})[0]
     si = SyntheticInterventions(regressor, regression_dim=donor_dim, context_dim=context_dim, num_donors=num_desired_donors)
     si.fit(df)
-    predicted_df, stats_df = si.predict(targets, progress=progress, statistics=False)
+    predicted_df, stats_df = si.predict(targets, progress=progress, statistics=True)
     predicted_df = predicted_df.reorder_levels(["unit", "intervention"])
     stats_df = stats_df.reorder_levels(["unit", "intervention"])
     return predicted_df, stats_df

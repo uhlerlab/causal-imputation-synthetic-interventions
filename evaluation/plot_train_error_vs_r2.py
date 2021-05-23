@@ -14,7 +14,7 @@ os.makedirs('evaluation/proj_stat_vs_r2/', exist_ok=True)
 
 alg = 'predict_synthetic_intervention_ols'
 num_donors = None
-cell_start = 0
+cell_start = None
 pert_start = None
 num_cells = None
 num_perts = 100
@@ -33,7 +33,7 @@ statistics_unit = statistics_unit[~statistics_unit.isna()]
 statistics_iv = statistics_iv[~statistics_iv.isna()]
 
 pm = PredictionManager(
-    cell_start=0,
+    cell_start=cell_start,
     num_cells=num_cells,
     num_perts=num_perts,
     name=name,
@@ -66,7 +66,7 @@ plt.xscale("log")
 plt.savefig("evaluation/train_error_vs_r2/relative_mse.png")
 
 plt.clf()
-plt.scatter(statistics_iv["stat"], relative_mses.values)
+plt.scatter(statistics_iv["stat"], relative_mses.values, c=statistics_iv["train_error"], s=4)
 plt.xlabel("Projection statistic")
 plt.ylabel("Relative MSE")
 plt.yscale("log")

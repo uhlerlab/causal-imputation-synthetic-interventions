@@ -3,7 +3,7 @@ from numpy.ma import masked_array
 import matplotlib.pyplot as plt
 
 
-def plot_availability_matrix(df, ytick_space=10):
+def plot_availability_matrix(df, ytick_space=10, savefig=None):
     counts = df.groupby(['intervention', 'unit']).size()
     sorted_perturbations = counts.groupby('intervention').size().sort_values(ascending=True)
     sorted_celltypes = counts.groupby('unit').size().sort_values(ascending=False)
@@ -26,3 +26,6 @@ def plot_availability_matrix(df, ytick_space=10):
     ax.tick_params(axis='x', bottom=True, top=False, labelbottom=True, labeltop=False, labelsize='x-small')
     ax.set_xticklabels([str(ix+1)+":"+ct for ix, ct in enumerate(sorted_celltypes.index)], ha='right', rotation=70)
     plt.tight_layout()
+
+    if savefig is not None:
+        plt.savefig(f"evaluation/availability/{savefig}.pdf", dpi=200)

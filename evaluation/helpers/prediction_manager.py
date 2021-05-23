@@ -8,12 +8,14 @@ import ipdb
 from multiprocessing import Pool, cpu_count
 from p_tqdm import p_map
 from src.algorithms import predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
+from src.algorithms.synthetic_interventions import predict_synthetic_intervention_ols as predict_synthetic_intervention_ols_old
 from src.algorithms.synthetic_interventions2 import predict_synthetic_intervention_ols
 from time import time
 
 
 BLACKLIST_KWARGS = {'verbose', 'multithread', 'overwrite', 'progress'}
 ADD_METRIC = True
+STAT_METHODS = {predict_synthetic_intervention_hsvt_ols, predict_synthetic_intervention_ols, predict_synthetic_intervention_ols_old}
 
 
 class PredictionManager:
@@ -125,7 +127,7 @@ class PredictionManager:
                 targets = self.gene_expression_df.iloc[test_ixs].index
 
                 start_time = time()
-                if alg == predict_synthetic_intervention_hsvt_ols or alg == predict_synthetic_intervention_ols:
+                if alg in STAT_METHODS:
                     df, stat_df = alg(training_df, targets, **kwargs)
                     df = df.loc[targets]
                     stat_df = stat_df.loc[targets]
@@ -153,7 +155,7 @@ class PredictionManager:
             else:
                 results = list(tqdm((run(task) for task in tasks), total=len(tasks)))
 
-            if alg == predict_synthetic_intervention_hsvt_ols or alg == predict_synthetic_intervention_ols:
+            if alg in STAT_METHODS:
                 prediction_dfs, stat_dfs, times_taken = zip(*results)
                 prediction_df = pd.concat(prediction_dfs, axis=0)
                 prediction_df.to_pickle(alg_results_filename)

@@ -6,6 +6,22 @@ from scipy.optimize import linprog
 import ipdb
 
 
+def get_spectral_alignment(svd_train, svd_test, energies=None):
+    if energies is None:
+        energies = np.linspace(.01, 1, 100)
+    umat_train, spectra_train, vmat_train = svd_train
+    umat_test, spectra_test, vmat_test = svd_test
+
+    stats = np.empty(len(energies))
+    for ix, energy in enumerate(energies):
+        umat_test_trunc, spectra_test_trunc, vmat_test_trunc, _ = hsvt_from_svd(umat_test, spectra_test, vmat_test, energy)
+        umat_train_trunc, spectra_train_trunc, vmat_train_trunc, _ = hsvt_from_svd(umat_train, spectra_train, vmat_train, energy)
+        # proj_stat = projection_stat(vmat_train_trunc, vmat_test) / vmat_test.shape[0]
+        proj_stat_trunc = projection_stat(vmat_train_trunc, vmat_test_trunc) / vmat_test_trunc.shape[0]
+        stats[ix] = proj_stat_trunc
+    return stats
+
+
 def spectra2energy_percent(spectra):
     spectra_sq = spectra ** 2
     spectra_total_energy = spectra_sq.cumsum()
@@ -185,7 +201,9 @@ class HSVTRegressor2:
         print(proj_stat, proj_stat_trunc)
         rank_train = len(spectra_train_trunc)
         rank_test = len(spectra_test_trunc)
-        return proj_stat_trunc, rank_train, rank_test
+        align = get_spectral_alignment(self.get_train_svd(train_x), (umat_test, spectra_test, vmat_test))
+        print(np.mean(align))
+        return np.mean(align), rank_train, rank_test
         # ipdb.set_trace()
 
 

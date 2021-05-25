@@ -198,11 +198,11 @@ class HSVTRegressor2:
         proj_stat = projection_stat(vmat_train_trunc, vmat_test) / vmat_test.shape[0]
         proj_stat_trunc = projection_stat(vmat_train_trunc, vmat_test_trunc) / vmat_test_trunc.shape[0]
         # print(spectra2energy_percent(self.spectra_train))
-        print(proj_stat, proj_stat_trunc)
+        # print(proj_stat, proj_stat_trunc)
         rank_train = len(spectra_train_trunc)
         rank_test = len(spectra_test_trunc)
         align = get_spectral_alignment(self.get_train_svd(train_x), (umat_test, spectra_test, vmat_test))
-        print(np.mean(align))
+        # print(np.mean(align))
         return np.mean(align), rank_train, rank_test
         # ipdb.set_trace()
 

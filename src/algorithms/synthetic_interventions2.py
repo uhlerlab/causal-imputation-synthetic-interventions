@@ -112,7 +112,7 @@ class SyntheticInterventions:
             vals = block.values.reshape(-1, len(contexts)*df.shape[1]).T
         return vals
 
-    def predict(self, targets, progress=False, statistics=True):
+    def predict(self, targets, progress=False, statistics=False):
         targets = targets.reorder_levels([self.context_dim, self.regression_dim])
         iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
 
@@ -165,7 +165,7 @@ def predict_synthetic_intervention_ols(
     context_dim = list({"intervention", "unit"} - {donor_dim})[0]
     si = SyntheticInterventions(regressor, regression_dim=donor_dim, context_dim=context_dim, num_donors=num_desired_donors)
     si.fit(df)
-    predicted_df, stats_df = si.predict(targets, progress=progress, statistics=True)
+    predicted_df, stats_df = si.predict(targets, progress=progress, statistics=False)
     predicted_df = predicted_df.reorder_levels(["unit", "intervention"])
     stats_df = stats_df.reorder_levels(["unit", "intervention"])
     return predicted_df, stats_df

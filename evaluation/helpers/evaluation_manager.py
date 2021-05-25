@@ -263,8 +263,8 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='Log base 10 of (# of seconds) per prediction.',
             title=self.prediction_manager.result_string,
-            top=-3,
-            bottom=-6,
+            top=-1,
+            bottom=-2.5,
         )
         plt.title("")
         self.savefig(f'time_boxplot')

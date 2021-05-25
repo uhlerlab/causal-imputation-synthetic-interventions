@@ -98,6 +98,8 @@ class EvaluationManager:
         os.makedirs(self.plot_folder2, exist_ok=True)
         self.collected_results = None
         self.true_results = None
+        self.true_diffs = None
+        self.predicted_diffs = None
 
     def savefig(self, filename):
         plt.savefig(f"{self.plot_folder}/{filename}.png", dpi=200)
@@ -143,19 +145,19 @@ class EvaluationManager:
         self.collected_results = pd.DataFrame(predicted_vals, index=pd_index)
         self.true_results = pd.DataFrame(true_vals, index=pd_index)
 
+        controls = self.prediction_manager.gene_expression_df
+        controls = controls[controls.index.get_level_values("intervention") == "DMSO"]
+        controls.reset_index("intervention", drop=True, inplace=True)
+        controls.columns = self.true_results.columns
+        self.true_diffs = self.true_results.subtract(controls, level="unit")
+        self.predicted_diffs = self.collected_results.subtract(controls, level="unit")
+
     def r2(self):
         r2s = compute_r2_matrix(self.true_results.values, self.collected_results.values)
         return pd.DataFrame(r2s, index=self.true_results.index)
 
     def cosines(self):
-        controls = self.prediction_manager.gene_expression_df
-        controls = controls[controls.index.get_level_values("intervention") == "DMSO"]
-        controls.reset_index("intervention", drop=True, inplace=True)
-        controls.columns = self.true_results.columns
-        true_diffs = self.true_results.subtract(controls, level="unit")
-        predicted_diffs = self.collected_results.subtract(controls, level="unit")
-        # ipdb.set_trace()
-        cosines = compute_cosine_sim(true_diffs, predicted_diffs)
+        cosines = compute_cosine_sim(self.true_diffs.values, self.predicted_diffs.values)
         return pd.DataFrame(cosines, index=self.true_results.index)
 
     def rmse(self):

@@ -154,6 +154,7 @@ class EvaluationManager:
         controls.columns = self.true_results.columns
         true_diffs = self.true_results.subtract(controls, level="unit")
         predicted_diffs = self.collected_results.subtract(controls, level="unit")
+        # ipdb.set_trace()
         cosines = compute_cosine_sim(true_diffs, predicted_diffs)
         return pd.DataFrame(cosines, index=self.true_results.index)
 
@@ -191,6 +192,10 @@ class EvaluationManager:
         cosine_df = self.cosines()
         algs = list(self.prediction_manager.prediction_filenames.keys())
         cos_dict = {alg_names[alg]: cosine_df.query('alg == @alg').values.flatten() for alg in algs}
+        # === FILTER OUT NAN'S, WHICH COME FROM FIXED EFFECTS PREDICTING THE CONTROL WHEN THERE IS NO
+        # === OTHER CONTEXT WITH THE INTERVENTION
+        cos_dict = {k: v[~np.isnan(v)] for k, v in cos_dict.items()}
+        # cos_dict = {k: np.nan_to_num(v) for k, v in cos_dict.items()}
         plt.clf()
         boxplots(
             cos_dict,

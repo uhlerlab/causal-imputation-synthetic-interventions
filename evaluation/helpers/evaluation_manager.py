@@ -113,6 +113,11 @@ class EvaluationManager:
         self.boxplot_relative_mse()
         self.plot_times()
 
+        # stats_df = self.get_res_and_stats(method)
+        # self.plot_train_error_vs_rmse(stats_df)
+        # self.plot_train_error_vs_cosine(stats_df)
+        # self.plot_train_error_vs_relative_mse(stats_df)
+
         self.plot_method_mse(method)
         self.plot_method_relative_mse(method)
         self.plot_quantile_relative_mse(method)
@@ -153,18 +158,22 @@ class EvaluationManager:
         self.predicted_diffs = self.collected_results.subtract(controls, level="unit")
 
     def r2(self):
+        if self.collected_results is None: self._collect_results()
         r2s = compute_r2_matrix(self.true_results.values, self.collected_results.values)
         return pd.DataFrame(r2s, index=self.true_results.index)
 
     def cosines(self):
+        if self.collected_results is None: self._collect_results()
         cosines = compute_cosine_sim(self.true_diffs.values, self.predicted_diffs.values)
         return pd.DataFrame(cosines, index=self.true_results.index)
 
     def rmse(self):
+        if self.collected_results is None: self._collect_results()
         rmses = compute_rmse_matrix(self.true_results.values, self.collected_results.values)
         return pd.DataFrame(rmses, index=self.true_results.index)
 
     def relative_mse(self, baseline_alg="alg=impute_unit_mean"):
+        if self.collected_results is None: self._collect_results()
         baseline = self.collected_results[self.collected_results.index.get_level_values("alg") == baseline_alg]
         num_algs = int(self.collected_results.values.shape[0] / baseline.shape[0])
         baseline = np.tile(baseline, (num_algs, 1))
@@ -183,7 +192,7 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='$R^2$ score per context/action pair',
             title=self.prediction_manager.result_string,
-            top=1,
+            top=1.05,
             bottom=.5,
             scale=.03
         )
@@ -203,9 +212,9 @@ class EvaluationManager:
             cos_dict,
             boxColors,
             xlabel='Algorithm',
-            ylabel='Cosine per context/action pair',
+            ylabel='Cosine similarity per context/action pair',
             title=self.prediction_manager.result_string,
-            top=1,
+            top=1.03,
             bottom=0,
             scale=.03
         )
@@ -298,6 +307,46 @@ class EvaluationManager:
         plt.axhline(1, color='k')
         plt.ylabel("Relative MSE of SI-Action at quantile")
         self.savefig(f"relative_mse_quantile_{method}")
+
+    def get_res_and_stats(self, method):
+        relative_mse_df = self.relative_mse()
+        relative_mse_df = relative_mse_df[relative_mse_df.index.get_level_values("alg") == method]
+        rmse_df = self.rmse()
+        rmse_df = rmse_df[rmse_df.index.get_level_values("alg") == method]
+        cos_df = self.cosines()
+        cos_df = cos_df[cos_df.index.get_level_values("alg") == method]
+
+        stats_df = pd.read_pickle(f"{self.prediction_manager.result_folder}/{method}_stats.pkl")
+
+        stats_df["relative_mse"] = relative_mse_df.values
+        stats_df["cosine"] = cos_df.values
+        stats_df["rmse"] = rmse_df.values
+
+        return stats_df
+
+    def plot_train_error_vs_rmse(self, stats_df):
+        plt.clf()
+        plt.scatter(stats_df["train_error"], stats_df["rmse"])
+        plt.xlabel("Training error")
+        plt.ylabel("RMSE")
+        plt.tight_layout()
+        self.savefig("train_error_vs_rmse")
+
+    def plot_train_error_vs_cosine(self, stats_df):
+        plt.clf()
+        plt.scatter(stats_df["train_error"], stats_df["cosine"])
+        plt.xlabel("Training error")
+        plt.ylabel("Cosine")
+        plt.tight_layout()
+        self.savefig("train_error_vs_cosine")
+
+    def plot_train_error_vs_relative_mse(self, stats_df):
+        plt.clf()
+        plt.scatter(stats_df["train_error"], stats_df["relative_mse"])
+        plt.xlabel("Training error")
+        plt.ylabel("Relative MSE")
+        plt.tight_layout()
+        self.savefig("train_error_vs_relative_mse")
 
     # === OLD
     def r2_per_iv(self):

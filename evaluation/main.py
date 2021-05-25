@@ -1,7 +1,7 @@
 from evaluation.helpers import PredictionManager, EvaluationManager
 from src.algorithms import impute_unit_mean, impute_intervention_mean, impute_two_way_mean
 from src.algorithms import predict_intervention_fixed_effect, predict_synthetic_intervention_ols
-from src.algorithms.synthetic_interventions2 import predict_synthetic_intervention_ols
+from src.algorithms.synthetic_interventions import predict_synthetic_intervention_ols
 from visuals.plot_availability_matrix import plot_availability_matrix
 from src.algorithms import impute_mice
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", action="store", dest="name", default="level2", type=str)
     parser.add_argument("--average", action="store", default=True, type=bool)
-    parser.add_argument("--num_perts", action="store", default=10000, type=int)
+    parser.add_argument("--num_perts", action="store", default=100, type=int)
     parser.add_argument("--num_cells", action="store", default=None, type=int)
     args = parser.parse_args()
 

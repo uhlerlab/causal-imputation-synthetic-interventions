@@ -3,6 +3,30 @@ from numpy.linalg import pinv
 from numpy import sqrt, log
 # from fancyimpute import SoftImpute
 from scipy.optimize import linprog
+import ipdb
+
+
+def get_spectral_alignment(svd_train, svd_test, energies=None):
+    if energies is None:
+        energies = np.linspace(.01, 1, 100)
+    umat_train, spectra_train, vmat_train = svd_train
+    umat_test, spectra_test, vmat_test = svd_test
+
+    stats = np.empty(len(energies))
+    for ix, energy in enumerate(energies):
+        umat_test_trunc, spectra_test_trunc, vmat_test_trunc, _ = hsvt_from_svd(umat_test, spectra_test, vmat_test, energy)
+        umat_train_trunc, spectra_train_trunc, vmat_train_trunc, _ = hsvt_from_svd(umat_train, spectra_train, vmat_train, energy)
+        # proj_stat = projection_stat(vmat_train_trunc, vmat_test) / vmat_test.shape[0]
+        proj_stat_trunc = projection_stat(vmat_train_trunc, vmat_test_trunc) / vmat_test_trunc.shape[0]
+        stats[ix] = proj_stat_trunc
+    return stats
+
+
+def spectra2energy_percent(spectra):
+    spectra_sq = spectra ** 2
+    spectra_total_energy = spectra_sq.cumsum()
+    percent_energy = spectra_total_energy / spectra_total_energy[-1]
+    return percent_energy
 
 
 def approximate_rank(spectra, energy):
@@ -17,6 +41,13 @@ def approximate_rank(spectra, energy):
 
 def hsvt(values, energy, max_rank=None):
     u, spectra, v = np.linalg.svd(values, full_matrices=False)
+    return hsvt_from_svd(u, spectra, v, energy, max_rank=max_rank)
+
+
+def hsvt_from_svd(u, spectra, v, energy, max_rank=None):
+    if energy == 1:
+        return u, spectra, v, 0
+
     rank, total_energy, captured_energy = approximate_rank(spectra, energy)
     if max_rank is not None:
         if rank > max_rank:
@@ -116,76 +147,64 @@ class MERegressor:
 
 
 class HSVTRegressor:
-    def __init__(self, center=True, energy=.95, sig_level=.05, hypo_test=True, hypo_test_percent=None, verbose=True, equal_rank=False, hypo_test_override=False):
-        self.center = center
+    def __init__(
+            self,
+            energy: float = 0.95,
+            compute_stats=False
+    ):
         self.energy = energy
+        self.compute_stats = compute_stats
+
+        self.intercept_ = None
         self.coef_ = None
-        self.bias = None
-        self.r1 = None
-        self.verbose = verbose
-        self.equal_rank = equal_rank
-        self.hypo_test_override = hypo_test_override
+        self.train_error = None
 
-        # parameters needed for hypothesis test
-        self.sig_level = sig_level
-        self.hypo_test = hypo_test
-        self.hypo_test_percent = hypo_test_percent
-        self.vmat_source = None
-        self.num_shared_ivs = None
-        self.t0 = None
-        self.sigma = None
+        self.umat_train = None
+        self.spectra_train = None
+        self.vmat_train = None
 
-    def fit(self, source_values, target_values):
-        # each column should correspond to a single intervention
-        if self.center:
-            source_values = source_values - source_values.mean(axis=0)
-            self.bias = target_values.mean()
-            target_values = target_values - self.bias
-
-        u_mat, spectra, v_mat, uncaptured_energy = hsvt(source_values, self.energy)
-        self.r1 = len(spectra)
-        if self.hypo_test:
-            self.vmat_source = v_mat
-            self.num_shared_ivs = source_values.shape[1]
-            self.t0 = source_values.shape[0]
-            self.sigma = np.sqrt(1 / self.t0 / self.num_shared_ivs * uncaptured_energy)
-
-        inv_source = (v_mat.T / spectra) @ u_mat.T
-        self.coef_ = inv_source @ target_values
-
-    def predict(self, source_values):
-        if self.center:
-            source_values = source_values - source_values.mean(axis=0)
-
-        if self.equal_rank:
-            u_mat, spectra, v_mat, _ = hsvt(source_values, self.energy, max_rank=self.r1)
+    def fit(self, train_x, train_y):
+        x_mean = train_x.mean(axis=0)
+        y_mean = train_y.mean()
+        train_x = train_x - x_mean
+        train_y = train_y - y_mean
+        if self.energy == 1:
+            self.coef_ = np.linalg.lstsq(train_x, train_y, rcond=None)[0]
+            self.intercept_ = y_mean - np.sum(self.coef_ * x_mean)
+            self.train_error = np.sqrt(np.sum((train_y - train_x @ self.coef_ - self.intercept_)**2)) / train_x.shape[0]
         else:
-            u_mat, spectra, v_mat, _ = hsvt(source_values, self.energy)
+            umat, spectra, vmat, _ = hsvt(train_x, energy=self.energy)
+            self.umat_train = umat
+            self.spectra_train = spectra
+            self.vmat_train = vmat
 
-        if self.hypo_test:
-            stat = projection_stat(self.vmat_source, v_mat)
-            num_dimensions = source_values.shape[0]
-            r2 = v_mat.shape[0]
+            inv_source = (vmat.T / spectra) @ umat.T
+            self.coef_ = inv_source @ train_y
+            self.intercept_ = y_mean - np.sum(self.coef_ * x_mean)
 
-            if self.hypo_test_percent is None:
-                critval = critical_value(self.sigma, self.r1, r2, self.num_shared_ivs, self.t0, num_dimensions, self.sig_level)
-            else:
-                critval = r2 * self.hypo_test_percent
+    def predict(self, test_x):
+        return test_x @ self.coef_ + self.intercept_
 
-            if stat > critval:
-                print(f"stat={stat}, critval={critval}, sigma={self.sigma}, r1={self.r1}, r2={r2}, n_d={self.num_shared_ivs}, t0={self.t0}, t1={num_dimensions}")
-            if stat > critval and self.hypo_test_override:
-                raise RejectionError(stat, critval)
+    def get_train_svd(self, train_x):
+        if self.umat_train is None:
+            u, s, v = np.linalg.svd(train_x, full_matrices=False)
+            self.umat_train, self.spectra_train, self.vmat_train = u, s, v
+        return self.umat_train, self.spectra_train, self.vmat_train
 
-        source_values = (u_mat*spectra) @ v_mat
-        res = source_values @ self.coef_
-        if self.center:
-            res += self.bias
-
-        if self.hypo_test:
-            return res, stat, critval
-        else:
-            return res
+    def projection_stat(self, train_x, test_x, energy=.99):
+        umat_train_trunc, spectra_train_trunc, vmat_train_trunc, _ = hsvt_from_svd(*self.get_train_svd(train_x), energy)
+        umat_test, spectra_test, vmat_test = np.linalg.svd(test_x, full_matrices=False)
+        umat_test_trunc, spectra_test_trunc, vmat_test_trunc, _ = hsvt_from_svd(umat_test, spectra_test, vmat_test, energy)
+        proj_stat = projection_stat(vmat_train_trunc, vmat_test) / vmat_test.shape[0]
+        proj_stat_trunc = projection_stat(vmat_train_trunc, vmat_test_trunc) / vmat_test_trunc.shape[0]
+        # print(spectra2energy_percent(self.spectra_train))
+        # print(proj_stat, proj_stat_trunc)
+        rank_train = len(spectra_train_trunc)
+        rank_test = len(spectra_test_trunc)
+        align = get_spectral_alignment(self.get_train_svd(train_x), (umat_test, spectra_test, vmat_test))
+        # print(np.mean(align))
+        return np.mean(align), rank_train, rank_test
+        # ipdb.set_trace()
 
 
 class RejectionError(Exception):
@@ -196,6 +215,32 @@ class RejectionError(Exception):
 
 if __name__ == '__main__':
     from functools import partial
-    regressor = MERegressor(matrix_estimator=partial(ssvt, energy=.95))
-    regressor.fit(np.random.random((5, 5)), np.random.random(5))
+    # regressor = MERegressor(matrix_estimator=partial(ssvt, energy=.95))
+    # regressor.fit(np.random.random((5, 5)), np.random.random(5))
+
+    import numpy as np
+    from sklearn.linear_model import LinearRegression
+
+    x = np.random.normal(size=(100, 3))
+    y = x @ np.array([1,2,3]) + 2
+
+    lr = LinearRegression()
+    lr.fit(x, y)
+    print(lr.coef_)
+    print(lr.intercept_)
+
+    lr2 = LinearRegression(fit_intercept=False)
+    y_mean = y.mean()
+    x_mean = x.mean(axis=0)
+    lr.fit(x - x_mean, y - y_mean)
+    print(lr.coef_)
+    xy_mean = np.sum(lr.coef_ * x_mean)
+    print(y_mean - xy_mean)
+
+    hs = HSVTRegressor2(energy=1)
+    hs.fit(x, y)
+    print(hs.coef_)
+    print(hs.intercept_)
+
+    ypred = hs.predict(x)
 

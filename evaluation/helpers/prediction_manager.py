@@ -7,15 +7,14 @@ from tqdm import tqdm
 import ipdb
 from multiprocessing import Pool, cpu_count
 from p_tqdm import p_map
-from src.algorithms import predict_synthetic_intervention_ols, predict_synthetic_intervention_hsvt_ols
 from src.algorithms.synthetic_interventions import predict_synthetic_intervention_ols as predict_synthetic_intervention_ols_old
-from src.algorithms.synthetic_interventions2 import predict_synthetic_intervention_ols
+from src.algorithms.synthetic_interventions import predict_synthetic_intervention_ols
 from time import time
 
 
 BLACKLIST_KWARGS = {'verbose', 'multithread', 'overwrite', 'progress'}
 ADD_METRIC = True
-STAT_METHODS = {predict_synthetic_intervention_hsvt_ols, predict_synthetic_intervention_ols, predict_synthetic_intervention_ols_old}
+STAT_METHODS = {predict_synthetic_intervention_ols, predict_synthetic_intervention_ols_old}
 
 
 class PredictionManager:

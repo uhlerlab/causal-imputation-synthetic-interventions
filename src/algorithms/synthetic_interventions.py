@@ -1,170 +1,157 @@
-import pandas as pd
-import numpy as np
-from collections import Counter
-from utils import get_index_dict
-from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
-from functools import partial
-from src.algorithms import HSVTRegressor, RejectionError
+import numpy as np
+import pandas as pd
 import ipdb
+import operator as op
+from collections import Counter, defaultdict
+from src.algorithms.hsvt_regressor import HSVTRegressor
 
 
-class NoContextsWithTargetAction(Exception):
-    pass
+class NoContextsWithTargetAction(UserWarning):
+    def __init__(self, target_action):
+        self.target_action = target_action
+        super().__init__()
+
+    def __str__(self):
+        return f"The action \"{self.target_action}\" has never been seen in the training data."
 
 
-class NoDonorActionsWithTargetContext(Exception):
-    pass
+class NoActionsWithTargetContext(UserWarning):
+    def __init__(self, target_context):
+        self.target_context = target_context
+        super().__init__()
+
+    def __str__(self):
+        return f"The context \"{self.target_context}\" has never been seen in the training data."
 
 
-def find_donors(
-        sorted_donors,
-        contexts2available_actions,
-        target_context,
-        target_action,
-        num_desired_donors=None
-):
-    donor_actions_with_target_context = [
-        donor for donor in sorted_donors
-        if donor in contexts2available_actions[target_context]
-    ]
-    # print(f"num donor actions: {len(donor_actions_with_target_context)}")
-    if len(donor_actions_with_target_context) == 0:
-        raise NoDonorActionsWithTargetContext
-
-    # start with training data which has the target_donor_ix available
-    current_training_contexts = [
-        context for context, available_actions in contexts2available_actions.items()
-        if target_action in available_actions
-    ]
-    # print(f"num training contexts: {len(current_training_contexts)}")
-    if len(current_training_contexts) == 0:
-        raise NoContextsWithTargetAction
-
-    donor_actions = set()
-    while True:
-        if len(donor_actions_with_target_context) == 0:
-            break
-        next_donor_action = donor_actions_with_target_context.pop(0)
-
-        # stop adding donors if it would make the number of training dimensions zero
-        new_training_contexts = [
-            train_ix for train_ix in current_training_contexts
-            if next_donor_action in contexts2available_actions[train_ix]
-        ]
-        if len(new_training_contexts) == 0:
-            break
-
-        # stop adding donors if we've reached the desired number of donors, and adding another
-        # donor would decrease the number of training dimensions
-        reached_num_desired = len(donor_actions) == num_desired_donors
-        if reached_num_desired and len(new_training_contexts) < len(current_training_contexts):
-            break
-
-        # otherwise, it's fine to add another donor
-        current_training_contexts = new_training_contexts
-        donor_actions.add(next_donor_action)
-
-    assert len(current_training_contexts) > 0
-    assert len(donor_actions) > 0
-    return current_training_contexts, donor_actions
+def get_index_dict(df, key_level, value_level):
+    d = defaultdict(set)
+    for entry in df.index:
+        d[entry[key_level]].add(entry[value_level])
+    return d
 
 
-def synthetic_intervention_inner(
-        df,
-        targets,
-        regressor,
-        predictor_no_training,
-        default_prediction,
-        regression_dim='intervention',
-        num_desired_donors=None,
-        progress=False
-):
-    assert regression_dim == 'intervention' or regression_dim == 'unit'
-    context_dim = 'unit' if regression_dim == 'intervention' else 'intervention'
+class SyntheticInterventions:
+    def __init__(
+            self,
+            regressor,
+            regression_dim="intervention",
+            context_dim="unit",
+            num_donors=10,
+    ):
+        self.regressor = regressor
+        self.regression_dim = regression_dim
+        self.context_dim = context_dim
+        self.num_donors = num_donors if num_donors is not None else float("inf")
 
-    df = df.sort_index(level=[regression_dim, context_dim])
+        self.default_prediction = None
+        self.training_df = None
+        self.context2actions = None
+        self.action2contexts = None
 
-    contexts2available_actions = get_index_dict(df, context_dim)
-    counter = Counter(df.index.get_level_values(regression_dim))
-    sorted_donors = [donor for donor, _ in counter.most_common()]
+    def fit(self, training_df):
+        df = training_df.reorder_levels([self.context_dim, self.regression_dim])
+        df = df.sort_index(level=[self.regression_dim, self.context_dim])
+        self.training_df = df
+        self.context2actions = get_index_dict(df, 0, 1)
+        self.action2contexts = get_index_dict(df, 1, 0)
+        self.default_prediction = df.values.mean(axis=0)
 
-    num_features = df.shape[1]
-    predicted_data = np.zeros((len(targets), num_features))
-    statistic_data = np.zeros((len(targets), 4))
-    statistic_data.fill(np.nan)
-    iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
-    rejection_counter = 0
-    for ix, (target_unit, target_intervention) in iterator:
-        target_action = target_intervention if regression_dim == 'intervention' else target_unit
-        target_context = target_unit if regression_dim == 'intervention' else target_intervention
+    def _find_donors(self, target_context, target_action):
+        # === FIND DONOR ACTIONS FOR THE TARGET CONTEXT
+        remaining_actions = self.context2actions[target_context]
+        if len(remaining_actions) == 0: raise NoActionsWithTargetContext(target_context)
 
-        # no target data on which to learn the regression model
-        try:
-            # find donor units
-            training_contexts, donor_actions = find_donors(
-                sorted_donors,
-                contexts2available_actions,
-                target_context,
-                target_action,
-                num_desired_donors
-            )
-            statistic_data[ix, [2, 3]] = [(len(donor_actions), len(training_contexts))]
+        # === FIND CONTEXTS WHERE THE TARGET ACTION IS MEASURED
+        current_contexts = self.action2contexts[target_action]
+        if len(current_contexts) == 0: raise NoContextsWithTargetAction(target_action)
 
-            # get donor source/target
-            donor_x = df[
-                df.index.get_level_values(context_dim).isin(training_contexts) &
-                df.index.get_level_values(regression_dim).isin(donor_actions)
-            ]
-            # donor_source = donor_source.sort_index()  # 14%
-            donor_x_values = donor_x.values.reshape(len(donor_actions), -1).T
-            assert donor_x_values.shape == (num_features*len(training_contexts), len(donor_actions))
-            donor_y = df[
-                df.index.get_level_values(context_dim).isin(training_contexts) &
-                (df.index.get_level_values(regression_dim) == target_action)
-            ]
-            # donor_target = donor_target.sort_index()  # 10%
-            donor_y_values = donor_y.values.flatten()
-            assert donor_y_values.shape == (num_features*len(training_contexts), )
+        # === GREEDILY PICK DONOR ACTIONS, UNTIL THE NUMBER OF TRAINING CONTEXTS WOULD BECOME ZERO _OR_
+        # === WE HAVE ENOUGH DONOR ACTIONS AND DON'T WANT TO DECREASE THE NUMBER OF TRAINING_CONTEXTS
+        donor_actions = set()
+        while True:
+            actions2new_contexts = {a: current_contexts & self.action2contexts[a] for a in remaining_actions}
+            new_donor_action, new_contexts = max(actions2new_contexts.items(), key=op.itemgetter(1))
+            if len(new_contexts) == 0: break
+            if len(new_contexts) < len(current_contexts) and len(donor_actions) >= self.num_donors: break
 
-            # perform regression
-            regressor.fit(donor_x_values, donor_y_values)
+            current_contexts = new_contexts
+            donor_actions.add(new_donor_action)
+            remaining_actions.remove(new_donor_action)
+            if len(remaining_actions) == 0: break
 
-            # predict
-            target_x = df[
-                (df.index.get_level_values(context_dim) == target_context) &
-                (df.index.get_level_values(regression_dim).isin(donor_actions))
-            ]
-            # target_source = target_source.sort_index()  # 12%
-            target_x_values = target_x.values.T
+        return current_contexts, donor_actions
 
-            if isinstance(regressor, HSVTRegressor) and regressor.hypo_test:
-                prediction, stat, critval = regressor.predict(target_x_values)
-                statistic_data[ix] = [stat, critval]
-            else:
-                prediction = regressor.predict(target_x_values)
+    def _get_block(self, contexts, actions=None):
+        df = self.training_df
+        if isinstance(contexts, str):
+            context_mask = df.index.get_level_values(0) == contexts
+        elif isinstance(contexts, set):
+            context_mask = df.index.get_level_values(0).isin(contexts)
+        elif contexts is None:
+            context_mask = True
+        else:
+            raise ValueError
 
-            predicted_data[ix] = prediction
-        except (NoContextsWithTargetAction, RejectionError) as err:
-            target_context_data = df[df.index.get_level_values(context_dim) == target_context].values
-            prediction = predictor_no_training(target_context_data)
-            print(target_context_data.shape[0], target_context)
-            statistic_data[ix, [2, 3]] = [target_context_data.shape[0], 0]
-            predicted_data[ix] = prediction
-            if isinstance(err, RejectionError):
-                statistic_data[ix, 0] = err.stat
-                statistic_data[ix, 1] = err.critval
-            else:
-                print(f"no training perturbations for target context {target_context}")
-            # ipdb.set_trace()
-        except NoDonorActionsWithTargetContext as e:
-            predicted_data[ix] = default_prediction
-            statistic_data[ix, [2, 3]] = [0, 0]
-            print(f"no donor data for target context {target_context}")
+        if isinstance(actions, str):
+            action_mask = df.index.get_level_values(1) == actions
+        elif isinstance(actions, set):
+            action_mask = df.index.get_level_values(1).isin(actions)
+        elif actions is None:
+            action_mask = True
+        else:
+            raise ValueError
 
-    predicted_df = pd.DataFrame(predicted_data, index=targets, columns=df.columns)
-    statistic_df = pd.DataFrame(statistic_data, index=targets, columns=['statistic', 'critval', 'num_donors', 'num_training'])
-    return predicted_df, statistic_df
+        block = df[context_mask & action_mask]
+        if isinstance(contexts, str):
+            vals = block.values.T
+        elif isinstance(actions, str):
+            vals = block.values.flatten()
+        else:
+            vals = block.values.reshape(-1, len(contexts)*df.shape[1]).T
+        return vals
+
+    def predict(self, targets, progress=False, statistics=False):
+        targets = targets.reorder_levels([self.context_dim, self.regression_dim])
+        iterator = enumerate(targets) if not progress else enumerate(tqdm(targets))
+
+        num_features = self.training_df.shape[1]
+        predicted_data = np.zeros((len(targets), num_features))
+        statistic_data = np.zeros((len(targets), 7))
+        statistic_data.fill(np.nan)
+        for ix, (target_context, target_action) in iterator:
+            try:
+                training_contexts, donor_actions = self._find_donors(target_context, target_action)
+
+                # === FIT
+                train_x = self._get_block(training_contexts, donor_actions)
+                train_y = self._get_block(training_contexts, target_action).flatten()
+                assert train_x.shape == (num_features*len(training_contexts), len(donor_actions))
+                assert train_y.shape == (num_features*len(training_contexts), )
+                self.regressor.fit(train_x, train_y)
+
+                # === PREDICT
+                test_x = self._get_block(target_context, donor_actions)
+                assert test_x.shape == (num_features, len(donor_actions))
+                predicted_y = self.regressor.predict(test_x)
+                predicted_data[ix] = predicted_y
+
+                # === ADD RELEVANT STATISTICS
+                statistic_data[ix, [2, 3]] = [(len(donor_actions), len(training_contexts))]
+                statistic_data[ix, 4] = self.regressor.train_error
+                if statistics:
+                    pstat, rank_train, rank_test = self.regressor.projection_stat(train_x, test_x)
+                    statistic_data[ix, 0] = pstat
+                    statistic_data[ix, [5, 6]] = [rank_train, rank_test]
+            except NoActionsWithTargetContext:
+                predicted_data[ix] = self.default_prediction
+            except NoContextsWithTargetAction:
+                predicted_data[ix] = self._get_block(target_context).mean(axis=1)
+
+        predicted_df = pd.DataFrame(predicted_data, index=targets, columns=self.training_df.columns)
+        statistic_df = pd.DataFrame(statistic_data, index=targets, columns=["stat", "cv", "num_donors", "num_contexts", "train_error", "rank_train", "rank_test"])
+        return predicted_df, statistic_df
 
 
 def predict_synthetic_intervention_ols(
@@ -172,65 +159,17 @@ def predict_synthetic_intervention_ols(
         targets,
         num_desired_donors,
         progress=False,
-        donor_dim='intervention'
+        donor_dim="intervention"
 ):
-    regressor = LinearRegression()
+    regressor = HSVTRegressor(energy=1)
+    context_dim = list({"intervention", "unit"} - {donor_dim})[0]
+    si = SyntheticInterventions(regressor, regression_dim=donor_dim, context_dim=context_dim, num_donors=num_desired_donors)
+    si.fit(df)
+    predicted_df, stats_df = si.predict(targets, progress=progress, statistics=False)
+    predicted_df = predicted_df.reorder_levels(["unit", "intervention"])
+    stats_df = stats_df.reorder_levels(["unit", "intervention"])
+    return predicted_df, stats_df
 
-    predictor_no_training = partial(np.mean, axis=0)
-    default_prediction = df.values.mean(axis=0)
-
-    predicted_df, statistics_df = synthetic_intervention_inner(
-        df,
-        targets,
-        regressor,
-        predictor_no_training,
-        default_prediction,
-        num_desired_donors=num_desired_donors,
-        regression_dim=donor_dim,
-        progress=progress
-    )
-    return predicted_df, statistics_df
-
-
-def predict_synthetic_intervention_hsvt_ols(
-        df,
-        targets,
-        num_desired_donors,
-        progress=False,
-        center=True,
-        energy=.99,
-        hypo_test=True,
-        sig_level=.05,
-        hypo_test_percent=None,
-        donor_dim='intervention',
-        equal_rank=False,
-        hypo_test_override=False
-):
-    regressor = HSVTRegressor(
-        center=center,
-        energy=energy,
-        sig_level=sig_level,
-        hypo_test=hypo_test,
-        hypo_test_percent=hypo_test_percent,
-        equal_rank=equal_rank,
-        hypo_test_override=hypo_test_override
-    )
-
-    predictor_no_training = partial(np.mean, axis=0)
-    default_prediction = df.values.mean(axis=0)
-
-    predicted_df, statistic_df = synthetic_intervention_inner(
-        df,
-        targets,
-        regressor,
-        predictor_no_training,
-        default_prediction,
-        num_desired_donors=num_desired_donors,
-        regression_dim=donor_dim,
-        progress=progress
-    )
-
-    return predicted_df, statistic_df
 
 
 

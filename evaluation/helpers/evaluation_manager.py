@@ -73,7 +73,7 @@ def compute_relative_mse_matrix(true_values, predicted_values, baseline):
 
 
 def compute_rmse_matrix(true_values, predicted_values):
-    return np.sqrt(np.mean((true_values - predicted_values)**2))
+    return np.sqrt(np.mean((true_values - predicted_values)**2, axis=1))
 
 
 def compute_r2_vector(true_values, predicted_values):
@@ -84,8 +84,8 @@ def compute_r2_vector(true_values, predicted_values):
 
 
 def compute_cosine_sim(true_vectors, predicted_vectors):
-    numerators = np.sum(true_vectors * predicted_vectors, axis=0)
-    denominators = np.linalg.norm(true_vectors, axis=0) * np.linalg.norm(predicted_vectors, axis=0)
+    numerators = np.sum(true_vectors * predicted_vectors, axis=1)
+    denominators = np.linalg.norm(true_vectors, axis=1) * np.linalg.norm(predicted_vectors, axis=1)
     return numerators/denominators
 
 
@@ -96,13 +96,17 @@ class EvaluationManager:
         os.makedirs(self.plot_folder, exist_ok=True)
         self.plot_folder2 = os.path.expanduser(f'~/Desktop/cmap-imputation/{self.prediction_manager.result_string}')
         os.makedirs(self.plot_folder2, exist_ok=True)
+        self.collected_results = None
+        self.true_results = None
 
     def savefig(self, filename):
         plt.savefig(f"{self.plot_folder}/{filename}.png", dpi=200)
         print(f"[EvaluationManager] Saving to {os.path.abspath(filename)}")
 
     def plots(self, method):
+        self._collect_results()
         self.boxplot_r2()
+        self.boxplot_cosines()
         self.boxplot_rmse()
         self.boxplot_relative_mse()
         self.plot_times()
@@ -113,125 +117,56 @@ class EvaluationManager:
 
         self.cosines()
 
-    def r2(self):
+    def _collect_results(self):
         num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
         num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
-        r2s = np.zeros(num_rows)
+        num_features = self.prediction_manager.gene_expression_df.shape[1]
+        predicted_vals = np.zeros((num_rows, num_features))
+        true_vals = np.zeros((num_rows, num_features))
         index = []
 
         ix = 0
         for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
-            print(f'[EvaluationManager.r2] computing r2 for {alg}')
+            print(f'[EvaluationManager._collect_results] computing statistic for {alg}')
             predicted_df = pd.read_pickle(prediction_filename)
-            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
-                # get test data that was held out in this fold
-                test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
-                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
-                predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
-                assert (test_df.index == predicted_df_fold.index).all()
-
-                if alg == 'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit':
-                    ipdb.set_trace()
-
-                # compute the R2 score for each gene expression profile
-                r2s[ix:(ix+predicted_df_fold.shape[0])] = compute_r2_matrix(test_df.values, predicted_df_fold.values)
-                units, ivs = predicted_df_fold.index.get_level_values('unit'), predicted_df_fold.index.get_level_values('intervention')
-                index.extend(list(zip(units, ivs, [fold_ix]*len(units), [alg]*len(units))))
-                ix += predicted_df_fold.shape[0]
-
-        res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
-        return res
-
-    def cosines(self):
-        num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
-        num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
-        r2s = np.zeros(num_rows)
-        index = []
-
-        ix = 0
-        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
-            print(f'[EvaluationManager.r2] computing r2 for {alg}')
-            predicted_df = pd.read_pickle(prediction_filename)
+            predicted_vals[ix:(ix + predicted_df.shape[0])] = predicted_df.values
 
             ixs = np.concatenate(self.prediction_manager.fold_test_ixs)
-            test_df = self.prediction_manager.gene_expression_df.iloc[ixs]
-            predicted_df = predicted_df.reset_index('fold', drop=True)
-            assert (test_df.index == predicted_df.index).all()
+            true_vals[ix:(ix + predicted_df.shape[0])] = self.prediction_manager.gene_expression_df.iloc[ixs].values
 
-            # compute the R2 score for each gene expression profile
-            r2s[ix:(ix+predicted_df.shape[0])] = compute_r2_matrix(test_df.values, predicted_df.values)
-            units, ivs = predicted_df.index.get_level_values('unit'), predicted_df.index.get_level_values('intervention')
-            index.extend(list(zip(units, ivs, [0]*len(units), [alg]*len(units))))   # TODO: FIX?
+            units, ivs = predicted_df.index.get_level_values('unit'), predicted_df.index.get_level_values(
+                'intervention')
+            index.extend(list(zip(units, ivs, list(range(predicted_df.shape[0])), [alg] * len(units))))
             ix += predicted_df.shape[0]
 
-        res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
-        return res
+        pd_index = pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg'])
+        self.collected_results = pd.DataFrame(predicted_vals, index=pd_index)
+        self.true_results = pd.DataFrame(true_vals, index=pd_index)
+
+    def r2(self):
+        r2s = compute_r2_matrix(self.true_results.values, self.collected_results.values)
+        return pd.DataFrame(r2s, index=self.true_results.index)
+
+    def cosines(self):
+        controls = self.prediction_manager.gene_expression_df
+        controls = controls[controls.index.get_level_values("intervention") == "DMSO"]
+        controls.reset_index("intervention", drop=True, inplace=True)
+        controls.columns = self.true_results.columns
+        true_diffs = self.true_results.subtract(controls, level="unit")
+        predicted_diffs = self.collected_results.subtract(controls, level="unit")
+        cosines = compute_cosine_sim(true_diffs, predicted_diffs)
+        return pd.DataFrame(cosines, index=self.true_results.index)
 
     def rmse(self):
-        num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
-        num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
-        rmses = np.zeros(num_rows)
-        index = []
+        rmses = compute_rmse_matrix(self.true_results.values, self.collected_results.values)
+        return pd.DataFrame(rmses, index=self.true_results.index)
 
-        ix = 0
-        algs = list(self.prediction_manager.prediction_filenames.keys())
-
-        for alg in algs:
-            print(f'[EvaluationManager.rmse] computing rmse for {alg}')
-            predicted_df = pd.read_pickle(self.prediction_manager.prediction_filenames[alg])
-            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
-                # get test data that was held out in this fold
-                test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
-                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
-                predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
-                assert (test_df.index == predicted_df_fold.index).all()
-
-                if alg == 'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit':
-                    ipdb.set_trace()
-
-                # compute the R2 score for each gene expression profile
-                rmses[ix:(ix + predicted_df_fold.shape[0])] = compute_rmse_matrix(test_df.values, predicted_df_fold.values)
-                units, ivs = predicted_df_fold.index.get_level_values('unit'), predicted_df_fold.index.get_level_values(
-                    'intervention')
-                index.extend(list(zip(units, ivs, [fold_ix] * len(units), [alg] * len(units))))
-                ix += predicted_df_fold.shape[0]
-
-        res = pd.DataFrame(
-            rmses,
-            index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg'])
-        )
-        return res
-
-    def relative_mse(self):
-        num_rows_per_alg = sum((len(ixs) for ixs in self.prediction_manager.fold_test_ixs))
-        num_rows = num_rows_per_alg * len(self.prediction_manager.prediction_filenames)
-        r2s = np.zeros(num_rows)
-        index = []
-
-        ix = 0
-        for alg, prediction_filename in self.prediction_manager.prediction_filenames.items():
-            print(f'[EvaluationManager.r2] computing r2 for {alg}')
-            predicted_df = pd.read_pickle(prediction_filename)
-            baseline_df = pd.read_pickle(self.prediction_manager.prediction_filenames["alg=impute_unit_mean"])
-            for fold_ix, test_ixs in enumerate(self.prediction_manager.fold_test_ixs):
-                # get test data that was held out in this fold
-                test_df = self.prediction_manager.gene_expression_df.iloc[test_ixs]
-                predicted_df_fold = predicted_df[predicted_df.index.get_level_values('fold') == fold_ix]
-                predicted_df_fold = predicted_df_fold.reset_index('fold', drop=True)
-                assert (test_df.index == predicted_df_fold.index).all()
-
-                if alg == 'alg=predict_synthetic_intervention_ols,num_desired_interventions=None,donor_dim=unit':
-                    ipdb.set_trace()
-
-                # compute the R2 score for each gene expression profile
-                baseline = baseline_df[baseline_df.index.get_level_values('fold') == fold_ix]
-                r2s[ix:(ix+predicted_df_fold.shape[0])] = compute_relative_mse_matrix(test_df.values, predicted_df_fold.values, baseline.values)
-                units, ivs = predicted_df_fold.index.get_level_values('unit'), predicted_df_fold.index.get_level_values('intervention')
-                index.extend(list(zip(units, ivs, [fold_ix]*len(units), [alg]*len(units))))
-                ix += predicted_df_fold.shape[0]
-
-        res = pd.DataFrame(r2s, index=pd.MultiIndex.from_tuples(index, names=['unit', 'intervention', 'fold_ix', 'alg']))
-        return res
+    def relative_mse(self, baseline_alg="alg=impute_unit_mean"):
+        baseline = self.collected_results[self.collected_results.index.get_level_values("alg") == baseline_alg]
+        num_algs = int(self.collected_results.values.shape[0] / baseline.shape[0])
+        baseline = np.tile(baseline, (num_algs, 1))
+        relative_mses = compute_relative_mse_matrix(self.true_results.values, self.collected_results.values, baseline)
+        return pd.DataFrame(relative_mses, index=self.true_results.index)
 
     # === BOX PLOTS
     def boxplot_r2(self):
@@ -250,7 +185,25 @@ class EvaluationManager:
             scale=.03
         )
         plt.title("")
-        self.savefig(f'boxplot')
+        self.savefig(f'r2_boxplot')
+
+    def boxplot_cosines(self):
+        cosine_df = self.cosines()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        cos_dict = {alg_names[alg]: cosine_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            cos_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='Cosine per context/action pair',
+            title=self.prediction_manager.result_string,
+            top=1,
+            bottom=0,
+            scale=.03
+        )
+        plt.title("")
+        self.savefig(f'cosine_boxplot')
 
     def boxplot_rmse(self):
         rmse_df = self.rmse()

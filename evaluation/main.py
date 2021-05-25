@@ -17,7 +17,7 @@ def run(name, average, num_perts, num_cells=None):
     )
     # plot_availability_matrix(pm.gene_expression_df, savefig=pm.result_string)
     # pm.predict(impute_missforest, overwrite=False)
-    # pm.predict(impute_mice, overwrite=False)
+    pm.predict(impute_mice, overwrite=False)
     pm.predict(impute_unit_mean, overwrite=False)
     pm.predict(impute_intervention_mean, overwrite=False)
     pm.predict(impute_two_way_mean, overwrite=False)
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", action="store", dest="name", default="level2", type=str)
     parser.add_argument("--average", action="store", default=True, type=bool)
-    parser.add_argument("--num_perts", action="store", default=100, type=int)
+    parser.add_argument("--num_perts", action="store", default=20, type=int)
     parser.add_argument("--num_cells", action="store", default=None, type=int)
     args = parser.parse_args()
 

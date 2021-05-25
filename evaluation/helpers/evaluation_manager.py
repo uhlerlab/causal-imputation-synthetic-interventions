@@ -214,9 +214,9 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='Cosine similarity per context/action pair',
             title=self.prediction_manager.result_string,
-            top=1.03,
+            top=1.05,
             bottom=0,
-            scale=.03
+            scale=.04
         )
         plt.title("")
         self.savefig(f'cosine_boxplot')
@@ -234,7 +234,8 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='RMSE per context/action pair',
             bottom=0,
-            top=800,
+            top=1000,
+            scale=.04,
             title=self.prediction_manager.result_string,
         )
         plt.title("")

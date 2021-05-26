@@ -273,7 +273,7 @@ class EvaluationManager:
             xlabel='Algorithm',
             ylabel='Log base 10 of (# of seconds) per prediction.',
             title=self.prediction_manager.result_string,
-            top=-1,
+            top=2.5,
             bottom=-2.5,
         )
         plt.title("")

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import seaborn as sns
 import numpy as np
+from scipy.stats import iqr
 from evaluation.plot_utils import boxplots
 sns.set()
 
@@ -14,12 +15,12 @@ boxColors = ['#addd8e', '#31a354', '#7fcdbb', '#2c7fb8',
 
 energy = 0.95
 alg_names = {
-    'alg=impute_unit_mean': 'Mean over Actions',
     'alg=impute_intervention_mean': 'Mean over Contexts',
+    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=unit': f'SI-Context',
     'alg=impute_two_way_mean': '2-way Mean',
+    'alg=impute_unit_mean': 'Mean over Actions',
     "alg=impute_mice": "MICE",
     'alg=predict_intervention_fixed_effect,control_intervention=DMSO': 'Fixed Effect',
-    f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=unit': f'SI-Context',
     f'alg=predict_synthetic_intervention_ols,num_desired_donors=None,donor_dim=intervention': f'SI-Action',
     f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=False,donor_dim=intervention': f'SI-action-HSVT',
     f'alg=predict_synthetic_intervention_hsvt_ols,num_desired_donors=None,energy=0.95,hypo_test=True,hypo_test_percent=0.1,donor_dim=intervention,equal_rank=True': f'SI-action-HSVT, +test',
@@ -72,8 +73,39 @@ def compute_relative_mse_matrix(true_values, predicted_values, baseline):
     return true_error/baseline_error
 
 
+def compute_relative_rmse_iqr(true_values, predicted_values, baseline):
+    baseline_error = compute_normalized_rmse_iqr_matrix(true_values, baseline)
+    true_error = compute_normalized_rmse_iqr_matrix(true_values, predicted_values)
+    return true_error/baseline_error
+
+
 def compute_rmse_matrix(true_values, predicted_values):
-    return np.sqrt(np.mean((true_values - predicted_values)**2, axis=1))
+    rmse = np.sqrt(np.mean((true_values - predicted_values)**2, axis=1))
+    return rmse
+
+
+def compute_mean_absolute_error_matrix(true_values, predicted_values):
+    mae = np.mean(np.abs(true_values - predicted_values), axis=1)
+    return mae
+
+
+def compute_relative_mean_absolute_error_matrix(true_values, predicted_values):
+    mae = np.mean(np.abs(true_values - predicted_values), axis=1)
+    rmae = mae / np.median(true_values, axis=1)
+    return rmae
+
+
+def compute_normalized_rmse_matrix(true_values, predicted_values):
+    rmse = compute_rmse_matrix(true_values, predicted_values)
+    normalized_rmse = rmse / np.mean(true_values, axis=1)
+    return normalized_rmse
+
+
+def compute_normalized_rmse_iqr_matrix(true_values, predicted_values):
+    rmse = compute_rmse_matrix(true_values, predicted_values)
+    iqrs = iqr(true_values, axis=1)
+    normalized_rmse = rmse / iqrs
+    return normalized_rmse
 
 
 def compute_r2_vector(true_values, predicted_values):
@@ -110,7 +142,12 @@ class EvaluationManager:
         self.boxplot_r2()
         self.boxplot_cosines()
         self.boxplot_rmse()
+        self.boxplot_rmae()
+        self.boxplot_normalized_rmse()
+        self.boxplot_normalized_rmse_iqr()
         self.boxplot_relative_mse()
+        self.boxplot_mae()
+        self.boxplot_relative_rmse_iqr()
         self.plot_times()
 
         # stats_df = self.get_res_and_stats(method)
@@ -172,6 +209,26 @@ class EvaluationManager:
         rmses = compute_rmse_matrix(self.true_results.values, self.collected_results.values)
         return pd.DataFrame(rmses, index=self.true_results.index)
 
+    def rmae(self):
+        if self.collected_results is None: self._collect_results()
+        rmaes = compute_relative_mean_absolute_error_matrix(self.true_results.values, self.collected_results.values)
+        return pd.DataFrame(rmaes, index=self.true_results.index)
+
+    def mean_absolute_error(self):
+        if self.collected_results is None: self._collect_results()
+        maes = compute_mean_absolute_error_matrix(self.true_results.values, self.collected_results.values)
+        return pd.DataFrame(maes, index=self.true_results.index)
+
+    def normalized_rmse(self):
+        if self.collected_results is None: self._collect_results()
+        nrmses = compute_normalized_rmse_matrix(self.true_results.values, self.collected_results.values)
+        return pd.DataFrame(nrmses, index=self.true_results.index)
+
+    def normalized_rmse_iqr(self):
+        if self.collected_results is None: self._collect_results()
+        nrmses = compute_normalized_rmse_iqr_matrix(self.true_results.values, self.collected_results.values)
+        return pd.DataFrame(nrmses, index=self.true_results.index)
+
     def relative_mse(self, baseline_alg="alg=impute_unit_mean"):
         if self.collected_results is None: self._collect_results()
         baseline = self.collected_results[self.collected_results.index.get_level_values("alg") == baseline_alg]
@@ -180,10 +237,19 @@ class EvaluationManager:
         relative_mses = compute_relative_mse_matrix(self.true_results.values, self.collected_results.values, baseline)
         return pd.DataFrame(relative_mses, index=self.true_results.index)
 
+    def relative_normalized_rmse_iqr(self, baseline_alg="alg=impute_unit_mean"):
+        if self.collected_results is None: self._collect_results()
+        baseline = self.collected_results[self.collected_results.index.get_level_values("alg") == baseline_alg]
+        num_algs = int(self.collected_results.values.shape[0] / baseline.shape[0])
+        baseline = np.tile(baseline, (num_algs, 1))
+        relative_mses = compute_relative_rmse_iqr(self.true_results.values, self.collected_results.values, baseline)
+        return pd.DataFrame(relative_mses, index=self.true_results.index)
+
     # === BOX PLOTS
     def boxplot_r2(self):
         r2_df = self.r2()
         algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
         r2_dict = {alg_names[alg]: r2_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
         boxplots(
@@ -202,6 +268,7 @@ class EvaluationManager:
     def boxplot_cosines(self):
         cosine_df = self.cosines()
         algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
         cos_dict = {alg_names[alg]: cosine_df.query('alg == @alg').values.flatten() for alg in algs}
         # === FILTER OUT NAN'S, WHICH COME FROM FIXED EFFECTS PREDICTING THE CONTROL WHEN THERE IS NO
         # === OTHER CONTEXT WITH THE INTERVENTION
@@ -224,7 +291,7 @@ class EvaluationManager:
     def boxplot_rmse(self):
         rmse_df = self.rmse()
         algs = list(self.prediction_manager.prediction_filenames.keys())
-        print(algs)
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
         # algs = list(alg_names.keys())
         r2_dict = {alg_names[alg]: rmse_df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
@@ -241,9 +308,90 @@ class EvaluationManager:
         plt.title("")
         self.savefig("rmse_boxplot")
 
+    def boxplot_rmae(self):
+        rmae_df = self.rmae()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
+        # algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: rmae_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='RMAE per context/action pair',
+            bottom=0,
+            top=1,
+            scale=.04,
+            title=self.prediction_manager.result_string,
+        )
+        plt.title("")
+        self.savefig("rmae_boxplot")
+
+    def boxplot_mae(self):
+        mae_df = self.mean_absolute_error()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
+        # algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: mae_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='MAE per context/action pair',
+            bottom=0,
+            top=1000,
+            scale=.04,
+            title=self.prediction_manager.result_string,
+        )
+        plt.title("")
+        self.savefig("mae_boxplot")
+
+    def boxplot_normalized_rmse(self):
+        rmse_df = self.normalized_rmse()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
+        # algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: rmse_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='Normalized RMSE per context/action pair',
+            bottom=0,
+            top=2,
+            scale=.04,
+            title=self.prediction_manager.result_string,
+        )
+        plt.title("")
+        self.savefig("normalized_rmse_boxplot")
+
+    def boxplot_normalized_rmse_iqr(self):
+        rmse_df = self.normalized_rmse_iqr()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
+        # algs = list(alg_names.keys())
+        r2_dict = {alg_names[alg]: rmse_df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='Normalized RMSE-IQR per context/action pair',
+            bottom=0,
+            top=1.5,
+            scale=.04,
+            title=self.prediction_manager.result_string,
+        )
+        plt.title("")
+        self.savefig("normalized_rmse_iqr_boxplot")
+
     def boxplot_relative_mse(self):
         df = self.relative_mse()
         algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
         r2_dict = {alg_names[alg]: df.query('alg == @alg').values.flatten() for alg in algs}
         plt.clf()
         boxplots(
@@ -260,9 +408,30 @@ class EvaluationManager:
         plt.title("")
         self.savefig("relative_mse_boxplot")
 
+    def boxplot_relative_rmse_iqr(self):
+        df = self.relative_mse()
+        algs = list(self.prediction_manager.prediction_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
+        r2_dict = {alg_names[alg]: df.query('alg == @alg').values.flatten() for alg in algs}
+        plt.clf()
+        boxplots(
+            r2_dict,
+            boxColors,
+            xlabel='Algorithm',
+            ylabel='Relative RMSE-IQR',
+            title=self.prediction_manager.result_string,
+            top=2.4,
+            bottom=0,
+            scale=.03
+        )
+        plt.ylim([0, 5])
+        plt.title("")
+        self.savefig("relative_rmse_iqr_boxplot")
+
     def plot_times(self):
         alg2times = dict()
         algs = list(self.prediction_manager.time_filenames.keys())
+        algs = sorted(algs, key=lambda alg: list(alg_names).index(alg))
 
         for alg in algs:
             times = np.loadtxt(self.prediction_manager.time_filenames[alg])

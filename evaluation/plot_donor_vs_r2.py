@@ -5,6 +5,14 @@ from tqdm import tqdm
 from utils import DonorFinder
 import ipdb
 import pandas as pd
+from scipy.stats import iqr
+
+
+def compute_normalized_rmse_iqr_matrix(true_values, predicted_values):
+    rmse = compute_rmse_matrix(true_values, predicted_values)
+    iqrs = iqr(true_values, axis=1)
+    normalized_rmse = rmse / iqrs
+    return normalized_rmse
 
 
 def compute_r2_matrix(true_values, predicted_values):
@@ -103,6 +111,13 @@ class VaryAvailabilityManager:
         rmse_df = pd.DataFrame(data=vals, index=predicted_values.index)
         return rmse_df
 
+    def nrmse_df(self):
+        predicted_values = self.predict()
+        true_values = self.true_values()
+        vals = compute_normalized_rmse_iqr_matrix(true_values.values, predicted_values.values)
+        nrmse_df = pd.DataFrame(data=vals, index=predicted_values.index)
+        return nrmse_df
+
     # def cos_df(self):
     #     predicted_values = self.predict()
     #     true_values = self.true_values()
@@ -161,4 +176,20 @@ if __name__ == '__main__':
     plt.ylabel("Average RMSE")
     plt.tight_layout()
     plt.savefig("visuals/figures/num-donors-num-training-rmse.png")
+
+    # === NRMSE
+    nrmse_df = vam.nrmse_df()
+    mean_df = nrmse_df.groupby(level=["num_donor", "num_training"]).mean()
+    std_df = nrmse_df.groupby(level=["num_donor", "num_training"]).std()
+    plt.clf()
+    for num_training, color in zip(range(1, min_training), sns.color_palette()):
+        means = mean_df[mean_df.index.get_level_values("num_training") == num_training].values.flatten()
+        stds = .1 * std_df[std_df.index.get_level_values("num_training") == num_training].values.flatten()
+        plt.plot(xs, means, label=num_training, color=color)
+        plt.fill_between(xs, means - stds, means + stds, alpha=.3, color=color)
+    plt.legend(title="Number of training contexts")
+    plt.xlabel("Number of donor actions")
+    plt.ylabel("Average Normalized RMSE")
+    plt.tight_layout()
+    plt.savefig("visuals/figures/num-donors-num-training-nrmse.png")
 

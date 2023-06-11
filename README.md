@@ -1,4 +1,6 @@
-# perturbation-transportability
+# Causal Imputation via Synthetic Interventions
+
+This code accompanies [Causal Imputation via Synthetic Interventions](https://arxiv.org/abs/2011.03127). See [here](https://scholar.google.com/scholar?cluster=9041495278699782854&hl=en&as_sdt=0,22) for the citation.
 
 The files are organized as follows:
 * `src` contains the baseline algorithms and the synthetic interventions algorithm
